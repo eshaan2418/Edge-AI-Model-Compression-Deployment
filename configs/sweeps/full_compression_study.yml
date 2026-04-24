@@ -1,0 +1,6 @@
+sweep_id: full_compression_study
+base_config: edge_ai_compression/configs/experiments/prune_then_eval.yml
+variants:
+  - compression_order_tag: "prune>quantize"
+  - compression_order_tag: "quantize>prune"
+  - compression_order_tag: "distill>prune>quantize"

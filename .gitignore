@@ -52,6 +52,13 @@ Thumbs.db
 logs/
 *.log
 
+# Framework run outputs
+edge_ai_compression/results/
+results/artifacts/
+results/sweeps/
+results/plots/
+results/surrogates/
+
 # Data and models (keep large/generated out of git)
 data/
 !data/README.md

@@ -1,0 +1,8 @@
+# Used by ``train.py`` as documentation; training is still driven by TrainConfig defaults
+# in ``src/model_compression/train.py`` unless you extend the trainer to read this file.
+data_dir: data
+batch_size: 128
+num_epochs: 5
+lr: 0.1
+model: resnet18_cifar
+dataset: cifar10

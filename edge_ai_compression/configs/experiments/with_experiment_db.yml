@@ -1,0 +1,27 @@
+model: resnet18_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 64
+num_workers: 0
+device: cpu
+seed: 42
+checkpoint_in: models/baseline_resnet18.pt
+checkpoint_out: models/db_run.pt
+compression_order_tag: "prune"
+hardware_profile: laptop_cpu
+compression:
+  pruning:
+    enabled: true
+    amount: 0.2
+    mode: global_unstructured
+    scorer: magnitude
+  quantization:
+    enabled: false
+  distillation:
+    enabled: false
+benchmark:
+  latency_repeats: 5
+  latency_warmup: 1
+experiment_db:
+  enabled: true
+  diagnostics_max_batches: 2

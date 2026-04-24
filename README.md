@@ -1,10 +1,64 @@
 <div align="center">
 
-# Model Compression for On‑Device Deployment (CIFAR‑10)
+# Hardware‑Aware Neural Network Compression & AutoML (Edge)
 
-Smaller, faster, and accurate deep learning models for edge devices. This project implements and benchmarks three core compression strategies — pruning, quantization, and knowledge distillation — on CIFAR‑10 using TensorFlow/Keras, with a clean MLOps‑style workflow.
+Smaller, faster, and accurate deep learning models for edge devices. The repository includes a **PyTorch research framework** (`edge_ai_compression`) with a compression pipeline, experiment runner, search (grid / random / Bayesian / evolutionary), Pareto analysis, benchmarking, and hardware-oriented entrypoints—alongside the original **TensorFlow/Keras** scripts for CIFAR‑10 baselines and TFLite workflows.
 
 </div>
+
+## Framework (`edge_ai_compression`)
+
+Install the package (PyTorch stack is declared in `pyproject.toml`):
+
+```bash
+pip install -U pip
+pip install -e .
+```
+
+Run an experiment from YAML, auto‑compression search, or hardware microbench:
+
+```bash
+python edge_ai_compression/experiments/run_experiment.py \
+  --config edge_ai_compression/configs/experiments/prune_then_eval.yml
+
+python edge_ai_compression/auto_compress.py \
+  --device raspberry_pi \
+  --max-latency-ms 50 \
+  --max-size-mb 50 \
+  --min-accuracy 0.5 \
+  --budget 4
+
+python edge_ai_compression/experiments/run_hardware_eval.py --model resnet18_cifar
+```
+
+Layout: `edge_ai_compression/core`, `compression`, `optimization`, `benchmarking`, `hardware`, `analysis`, `data`, `utils`, `experiment_db`, `surrogate`, `policy`, `theory`, `configs/`, `experiments/`, and `auto_compress.py`.
+
+### Research system (what is implemented now)
+
+| Area | Capability |
+|------|----------------|
+| **Experiment DB** | Every run can log to `results/experiments.csv`, `results/experiments.jsonl`, and `results/artifacts/{experiment_id}/` (`config.yaml`, `metrics.json`, `model.pt`, `latency_trace.npy`, `confusion_matrix.npy`, `failure_cases.json`, `model.tflite` placeholder). Enable with `experiment_db.enabled: true` in YAML (see `edge_ai_compression/configs/experiments/with_experiment_db.yml`). |
+| **Layer-wise pruning** | `pruning.mode: layerwise_adaptive` with scorers `magnitude`, `gradient`, `activation`, `ablation` under `compression/pruning/layerwise/`. |
+| **Compression order** | `compression_order` or `compression_order_tag` (e.g. `distill>prune>quantize`) drives stage order; see `edge_ai_compression/core/compression_orders.py`. |
+| **Multi-objective** | Pareto frontier, NSGA-II (`optimization/search/nsga2.py`), `search_compression.py --objective pareto`. |
+| **Surrogates / policy** | `train_surrogate.py` trains RF/MLP/GP on the CSV; `policy/supervised.py` picks a feasible row under constraints. |
+| **Failure + calibration** | Confusion matrices, per-class accuracy, ECE, NLL, failure cases (`analysis/diagnostics.py`). |
+| **Datasets** | `cifar10`, `cifar100`, `tiny_imagenet` via `build_loaders()`. |
+| **Sweeps** | `launch_sweep.py` / `configs/sweeps/` (sequential runner; parallel workers are the next increment). |
+| **Quality** | `.pre-commit-config.yaml` (ruff), `.github/workflows/ci.yml`. |
+
+### Root CLI (Phase 16)
+
+```bash
+python train.py
+python run_experiment.py --config edge_ai_compression/configs/experiments/prune_then_eval.yml
+python launch_sweep.py --config configs/sweeps/full_compression_study.yml
+python resume_sweep.py --sweep-id full_compression_study
+python train_surrogate.py --results results/experiments.csv --out results/surrogates
+python search_compression.py --objective pareto --results results/experiments.csv
+python analyze_failures.py --experiment-id <uuid>
+python plot_results.py   # needs: pip install -e '.[viz]'
+```
 
 ## Highlights
 - End‑to‑end baseline: ResNet50 with in‑model preprocessing and data augmentation

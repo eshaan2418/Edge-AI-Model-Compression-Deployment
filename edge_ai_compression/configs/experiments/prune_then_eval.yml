@@ -1,0 +1,21 @@
+model: resnet18_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 128
+num_workers: 2
+device: cpu
+seed: 42
+checkpoint_in: models/baseline_resnet18.pt
+checkpoint_out: models/pruned_eval.pt
+compression:
+  pruning:
+    enabled: true
+    amount: 0.5
+  quantization:
+    enabled: false
+  distillation:
+    enabled: false
+benchmark:
+  latency_repeats: 30
+  results_md: edge_ai_compression/results/benchmark_append.md
+  results_jsonl: edge_ai_compression/results/runs.jsonl

@@ -1,0 +1,4 @@
+name: cifar10
+data_dir: data
+batch_size: 128
+num_workers: 2
