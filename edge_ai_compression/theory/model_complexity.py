@@ -1,11 +1,61 @@
 from __future__ import annotations
 
+import io
+from typing import Any
+
 import torch
 import torch.nn as nn
 
 
 def count_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
+
+
+def count_trainable_parameters(model: nn.Module) -> int:
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def state_dict_size_mb(model: nn.Module) -> float:
+    """Serialized ``state_dict`` size in MiB (a proxy for on-disk model size)."""
+    buf = io.BytesIO()
+    torch.save(model.state_dict(), buf)
+    return buf.tell() / (1024 * 1024)
+
+
+def sparsity(model: nn.Module) -> float:
+    """Fraction of weight elements that are exactly zero (0.0 if no params)."""
+    total = 0
+    zeros = 0
+    for p in model.parameters():
+        total += p.numel()
+        zeros += int((p == 0).sum().item())
+    return float(zeros) / total if total else 0.0
+
+
+def model_summary(model: nn.Module) -> dict[str, Any]:
+    """A JSON-serializable structural summary of a model.
+
+    Captures parameter counts, a size estimate, weight sparsity, and a per-layer
+    module-type histogram. Cheap and dependency-free (no forward pass).
+    """
+    layer_types: dict[str, int] = {}
+    for module in model.modules():
+        name = type(module).__name__
+        # Skip container modules that merely hold children.
+        if name in ("Sequential", "ModuleList", "ModuleDict") or module is model:
+            continue
+        layer_types[name] = layer_types.get(name, 0) + 1
+
+    num_params = count_parameters(model)
+    return {
+        "class_name": type(model).__name__,
+        "num_parameters": num_params,
+        "num_trainable_parameters": count_trainable_parameters(model),
+        "size_mb": round(state_dict_size_mb(model), 6),
+        "weight_sparsity": round(sparsity(model), 6),
+        "num_modules": sum(layer_types.values()),
+        "layer_type_histogram": dict(sorted(layer_types.items())),
+    }
 
 
 def estimate_flops_macs(model: nn.Module, input_shape: tuple[int, int, int, int]) -> float:

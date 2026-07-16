@@ -10,12 +10,14 @@ import numpy as np
 import torch
 import yaml
 
+from edge_ai_compression.experiment_db.environment import capture_environment
 from edge_ai_compression.experiment_db.paths import (
     ARTIFACTS_DIR,
     EXPERIMENTS_CSV,
     EXPERIMENTS_JSONL,
 )
 from edge_ai_compression.experiment_db.record import EXPERIMENT_CSV_FIELDS, ExperimentRecord
+from edge_ai_compression.theory.model_complexity import model_summary as _model_summary
 
 
 def ensure_results_dirs() -> None:
@@ -63,6 +65,12 @@ def write_artifacts(
 
     with open(root / "metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2, default=str)
+
+    # Reproducibility snapshot + structural model summary (best-effort, never fatal).
+    with open(root / "environment.json", "w", encoding="utf-8") as f:
+        json.dump(capture_environment(), f, indent=2, default=str)
+    with open(root / "model_summary.json", "w", encoding="utf-8") as f:
+        json.dump(_model_summary(model), f, indent=2, default=str)
 
     torch.save({"model_state": model.state_dict()}, root / "model.pt")
 
