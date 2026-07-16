@@ -230,6 +230,7 @@ Standalone, offline command-line tools (all support `--help`):
 | `python -m edge_ai_compression.analysis.pareto --results results/experiments.csv --out results/pareto` | Pareto frontier over logged runs → `pareto_frontier.csv/.md` (+ `--plot`). |
 | `python -m edge_ai_compression.hardware.score --metrics results/benchmark.json --profile raspberry_pi` | Score metrics against a device budget (feasible? utilization? violations?). |
 | `python -m edge_ai_compression.export --model resnet18_cifar --format torchscript` | Export a model: `torchscript` / `onnx` / `json` (metadata) / `tflite` (guided error). |
+| `python -m edge_ai_compression.reporting.generate_report --demo results/demo/report.json --out reports/index.html` | Build a static HTML report (+ JSON summary) from demo/benchmark/pareto/hardware outputs. |
 
 Hardware profiles (`cpu`, `raspberry_pi`, `smartphone`, `microcontroller_sim`)
 are **documented planning budgets, not measured device ceilings** — confirm on

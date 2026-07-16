@@ -165,8 +165,8 @@ def main(argv: list[str] | None = None) -> None:
     report = run_demo(quick=quick, out_dir=args.out)
 
     args.out.mkdir(parents=True, exist_ok=True)
-    json_path = args.out / "demo_report.json"
-    md_path = args.out / "demo_report.md"
+    json_path = args.out / "report.json"
+    md_path = args.out / "report.md"
     json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     md_path.write_text(_to_markdown(report), encoding="utf-8")
 

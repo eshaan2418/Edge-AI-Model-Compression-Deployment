@@ -33,7 +33,7 @@ def test_demo_disclaimer_flags_synthetic():
 
 def test_demo_cli_writes_reports(tmp_path):
     main(["--quick", "--out", str(tmp_path)])
-    assert (tmp_path / "demo_report.json").is_file()
-    md = (tmp_path / "demo_report.md").read_text()
+    assert (tmp_path / "report.json").is_file()
+    md = (tmp_path / "report.md").read_text()
     assert "synthetic" in md.lower()
     assert "Params" in md
