@@ -5,6 +5,12 @@
 Smaller, faster, still‑accurate deep‑learning models for edge devices — with a
 research pipeline for searching the compression trade‑off space.
 
+![CI](https://github.com/eshaan2418/Edge-AI-Model-Compression-Deployment/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-supported-ee4c2c)
+![TensorFlow](https://img.shields.io/badge/TensorFlow%2FTFLite-supported-ff6f00)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 </div>
 
 This repository contains **two complementary stacks**. Pick the one that matches
