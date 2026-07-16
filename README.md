@@ -231,6 +231,8 @@ Standalone, offline command-line tools (all support `--help`):
 | `python -m edge_ai_compression.hardware.score --metrics results/benchmark.json --profile raspberry_pi` | Score metrics against a device budget (feasible? utilization? violations?). |
 | `python -m edge_ai_compression.export --model resnet18_cifar --format torchscript` | Export a model: `torchscript` / `onnx` / `json` (metadata) / `tflite` (guided error). |
 | `python -m edge_ai_compression.reporting.generate_report --demo results/demo/report.json --out reports/index.html` | Build a static HTML report (+ JSON summary) from demo/benchmark/pareto/hardware outputs. |
+| `python -m edge_ai_compression.config.validate <config.yml> [--strict]` | Validate an experiment config against the runner schema (registry-checked model/dataset). |
+| `python -m edge_ai_compression.recipes.list` / `.show <name>` / `.apply --recipe <name> --base-config <cfg> --out <path>` | Named compression recipes → generate a merged, schema-valid config (no training). |
 
 Hardware profiles (`cpu`, `raspberry_pi`, `smartphone`, `microcontroller_sim`)
 are **documented planning budgets, not measured device ceilings** — confirm on

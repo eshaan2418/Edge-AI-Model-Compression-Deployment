@@ -57,6 +57,8 @@ logs/
 # source package edge_ai_compression/results/ handling stays explicit below.
 edge_ai_compression/results/
 /results/
+/reports/
+/configs/generated/
 
 # Data and models (keep large/generated out of git).
 # Anchored to the repo root so the source packages edge_ai_compression/data/
