@@ -21,5 +21,9 @@ jobs:
         run: ruff check .
       - name: Ruff (format)
         run: ruff format --check .
+      - name: Compileall
+        run: python -m compileall edge_ai_compression src tests
       - name: Pytest
         run: pytest -q
+      - name: Offline demo (smoke)
+        run: python -m edge_ai_compression.demo --quick

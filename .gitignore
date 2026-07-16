@@ -52,12 +52,11 @@ Thumbs.db
 logs/
 *.log
 
-# Framework run outputs
+# Framework run outputs (generated: experiment DB, benchmarks, demo, pareto,
+# artifacts, sweeps, plots, surrogates). Anchored to the repo root so the tracked
+# source package edge_ai_compression/results/ handling stays explicit below.
 edge_ai_compression/results/
-results/artifacts/
-results/sweeps/
-results/plots/
-results/surrogates/
+/results/
 
 # Data and models (keep large/generated out of git).
 # Anchored to the repo root so the source packages edge_ai_compression/data/
