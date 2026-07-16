@@ -88,10 +88,13 @@ flowchart LR
     HW --> Ship
 ```
 
-See [`docs/architecture.md`](docs/architecture.md) for a component-level tour,
+Start at [`docs/index.md`](docs/index.md) for the documentation landing page, or
+jump to [`docs/architecture.md`](docs/architecture.md) for a component-level tour,
 [`docs/experiments.md`](docs/experiments.md) for the experiment/DB workflow,
 [`docs/deployment.md`](docs/deployment.md) for export + hardware targets, and
 [`docs/recruiter_demo.md`](docs/recruiter_demo.md) for a 5-minute guided tour.
+The docs render on GitHub as-is, or serve them locally with `pip install -e
+".[docs]"` then `mkdocs serve`.
 
 ---
 
