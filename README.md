@@ -18,6 +18,92 @@ what you want to do:
 The two stacks are independent — the PyTorch framework does **not** require
 TensorFlow, and vice versa. Everything runs on a normal **CPU**; no GPU needed.
 
+### Why this project
+
+Deploying deep models to phones, SBCs, and microcontrollers is a
+multi-objective problem: accuracy, latency, model size, and RAM all pull against
+each other, and the "best" model depends on the *target device*. This repo treats
+that as a first-class engineering problem — reproducible compression experiments,
+a tracked experiment database, multi-objective (Pareto) analysis, hardware-aware
+feasibility scoring, and honest export tooling — rather than a one-off script.
+
+### Highlights
+
+- **60-second offline demo** — `python -m edge_ai_compression.demo --quick`
+  prunes + quantizes a model and prints a size/latency trade-off table. No
+  downloads, no GPU.
+- **Reproducible experiment DB** — every run can capture environment, model
+  summary, metrics, and artifacts.
+- **Multi-objective analysis** — Pareto frontier CLI + NSGA-II search over the
+  compression trade-off space.
+- **Hardware-aware scoring** — score a model's metrics against documented device
+  budgets (Raspberry Pi, smartphone, MCU) for feasibility.
+- **Honest export** — TorchScript / ONNX / JSON with clear, actionable errors; no
+  fake TFLite placeholders.
+- **Fast & offline CI** — the whole test suite is CPU-only and needs no network.
+
+### Architecture at a glance
+
+```mermaid
+flowchart LR
+    subgraph Data
+        A[Datasets: CIFAR-10/100, Tiny-ImageNet]
+        F[Synthetic 'fake' data<br/>offline, for CI/demo]
+    end
+    subgraph Models
+        M[ModelRegistry<br/>ResNet-18 / MobileNetV2 / EfficientNet / small CNN]
+    end
+    subgraph Compress
+        P[Pruning] --> Q[Quantization] --> D[Distillation]
+    end
+    subgraph Evaluate
+        B[Benchmark harness<br/>latency / size / RAM / FLOPs]
+        E[Evaluator<br/>accuracy / ECE / failures]
+    end
+    subgraph Decide
+        PA[Pareto analysis]
+        HW[Hardware-aware scoring]
+        DB[(Experiment DB<br/>csv / jsonl / artifacts)]
+    end
+    subgraph Ship
+        X[Export: TorchScript / ONNX / JSON]
+        T[TFLite via TF/Keras scripts]
+    end
+    A --> M
+    F --> M
+    M --> Compress
+    Compress --> B
+    Compress --> E
+    B --> DB
+    E --> DB
+    DB --> PA
+    DB --> HW
+    Compress --> X
+    HW --> Ship
+```
+
+See [`docs/architecture.md`](docs/architecture.md) for a component-level tour,
+[`docs/experiments.md`](docs/experiments.md) for the experiment/DB workflow,
+[`docs/deployment.md`](docs/deployment.md) for export + hardware targets, and
+[`docs/recruiter_demo.md`](docs/recruiter_demo.md) for a 5-minute guided tour.
+
+---
+
+## 60-second offline demo
+
+```bash
+pip install -e ".[dev]"
+python -m edge_ai_compression.demo --quick     # or: python demo.py --quick
+```
+
+This runs entirely on CPU with **synthetic data** (no downloads): it benchmarks a
+small model, prunes + dynamically quantizes it, and prints a trade-off table plus
+JSON/Markdown reports under `results/demo/`.
+
+> The demo's `synthetic_accuracy` is measured on **randomly labeled fake data** —
+> it is a plumbing/sanity number, not a quality metric. For real accuracy, run the
+> experiment runner on CIFAR.
+
 ---
 
 ## Quickstart (5 minutes, CPU‑only)
@@ -35,7 +121,7 @@ pip install -e ".[dev]"
 
 # Sanity check:
 ruff check .
-pytest -q                          # 8 tests, ~3s, no downloads
+pytest -q                          # CPU-only, a few seconds, no downloads
 
 # Tiny end‑to‑end experiment — fully offline, no downloads, ~3s on CPU:
 python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
@@ -127,6 +213,22 @@ Layout: `core`, `compression`, `optimization`, `benchmarking`, `hardware`,
 `analysis`, `data`, `utils`, `experiment_db`, `surrogate`, `policy`, `theory`,
 `configs/`, `experiments/`, `auto_compress.py`.
 
+### Analysis & deployment CLIs
+
+Standalone, offline command-line tools (all support `--help`):
+
+| Command | What it does |
+|---------|--------------|
+| `python -m edge_ai_compression.demo --quick` | Offline synthetic prune+quantize demo → trade-off table + `results/demo/`. |
+| `python -m edge_ai_compression.benchmarking.benchmark_model --model resnet18_cifar` | Benchmark a model on synthetic input (latency percentiles, size, params, FLOPs, RAM) → JSON. |
+| `python -m edge_ai_compression.analysis.pareto --results results/experiments.csv --out results/pareto` | Pareto frontier over logged runs → `pareto_frontier.csv/.md` (+ `--plot`). |
+| `python -m edge_ai_compression.hardware.score --metrics results/benchmark.json --profile raspberry_pi` | Score metrics against a device budget (feasible? utilization? violations?). |
+| `python -m edge_ai_compression.export --model resnet18_cifar --format torchscript` | Export a model: `torchscript` / `onnx` / `json` (metadata) / `tflite` (guided error). |
+
+Hardware profiles (`cpu`, `raspberry_pi`, `smartphone`, `microcontroller_sim`)
+are **documented planning budgets, not measured device ceilings** — confirm on
+real hardware before shipping. See [`docs/deployment.md`](docs/deployment.md).
+
 ---
 
 ## TensorFlow / Keras TFLite scripts (root)
@@ -198,7 +300,30 @@ pytest -q             # tests
 ```
 
 CI (`.github/workflows/ci.yml`) runs `ruff check .`, `ruff format --check .`,
-and `pytest -q` on Python 3.11.
+`pytest -q`, `python -m compileall`, and the offline demo on Python 3.11 — all
+CPU-only and network-free.
+
+## Honesty & limitations
+
+This project is deliberate about not overstating results:
+
+- **Synthetic ≠ real.** Anything run on the `fake` dataset (CI, the demo) uses
+  random labels. Those numbers verify plumbing, not model quality. Real accuracy
+  comes only from CIFAR/Tiny-ImageNet runs.
+- **Hardware profiles are budgets.** The device numbers are documented planning
+  targets, not measurements from physical hardware.
+- **No fake exports.** TFLite export from PyTorch is refused with guidance rather
+  than emitting a placeholder; the real TFLite path is the TF/Keras scripts.
+- **No committed artifacts.** Weights, datasets, and benchmark outputs are
+  git-ignored; the repo ships code, not results.
+
+## Roadmap
+
+- Structured (channel) pruning with real FLOP reduction, not just sparsity.
+- Static/QAT quantization paths alongside dynamic quantization.
+- End-to-end ONNX → TFLite conversion helper (currently a guided manual path).
+- On-device latency measurement to validate the hardware-profile budgets.
+- Expanded surrogate models + Bayesian optimization for the search loop.
 
 ## License
 
