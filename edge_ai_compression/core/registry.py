@@ -23,6 +23,11 @@ class ModelRegistry:
             raise KeyError(f"Unknown model '{name}'. Registered: {sorted(cls._builders)}")
         return cls._builders[name](num_classes=num_classes, **kwargs)
 
+    @classmethod
+    def available(cls) -> list[str]:
+        """Return the sorted list of registered model names."""
+        return sorted(cls._builders)
+
 
 def _default_register() -> None:
     ModelRegistry.register("resnet18_cifar", resnet18_cifar)
