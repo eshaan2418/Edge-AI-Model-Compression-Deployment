@@ -236,6 +236,10 @@ Standalone, offline command-line tools (all support `--help`):
 | `python -m edge_ai_compression.reporting.generate_report --demo results/demo/report.json --out reports/index.html` | Build a static HTML report (+ JSON summary) from demo/benchmark/pareto/hardware outputs. |
 | `python -m edge_ai_compression.config.validate <config.yml> [--strict]` | Validate an experiment config against the runner schema (registry-checked model/dataset). |
 | `python -m edge_ai_compression.recipes.list` / `.show <name>` / `.apply --recipe <name> --base-config <cfg> --out <path>` | Named compression recipes → generate a merged, schema-valid config (no training). |
+| `python -m edge_ai_compression.reporting.model_card --metrics results/demo/report.json --profile raspberry_pi` | Generate an honest Markdown model card (flags synthetic metrics; no production claims without real data). |
+| `python -m edge_ai_compression.hardware.compare --metrics results/demo/report.json` | Rank one model's metrics against every hardware profile (feasible-first, scored). |
+| `python -m edge_ai_compression.analysis.search_space --config configs/sweeps/full_compression_study.yml` | Summarize a sweep's candidate count and dimensions before running it. |
+| `python -m edge_ai_compression.repro.manifest --config <config.yml>` | Capture a reproducibility manifest (git state, env, package versions, config hash, seeds). |
 
 Hardware profiles (`cpu`, `raspberry_pi`, `smartphone`, `microcontroller_sim`)
 are **documented planning budgets, not measured device ceilings** — confirm on
