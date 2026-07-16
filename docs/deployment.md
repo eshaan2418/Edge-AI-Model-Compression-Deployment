@@ -66,6 +66,20 @@ Metric names are flexible: `latency_ms` or `latency_ms_mean`, `ram_mb` or
 `peak_ram_mib`, etc. Missing metrics are reported as `unknown` rather than
 silently assumed.
 
+### Comparing across all profiles
+
+To see one model's feasibility against **every** profile at once:
+
+```bash
+python -m edge_ai_compression.hardware.compare \
+    --metrics results/demo/report.json \
+    --out results/hardware_comparison.md
+```
+
+This prints a table (feasible? score? violations? preferred export) sorted
+feasible-first, and writes the same table as Markdown. It accepts demo reports,
+benchmark reports, or plain metrics JSON.
+
 ## Real TFLite path (TensorFlow/Keras scripts)
 
 ```bash
