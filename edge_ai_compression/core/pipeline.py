@@ -52,7 +52,9 @@ class PruningStage(CompressionStage):
 
 class QuantizationStage(CompressionStage):
     def __init__(self, mode: str = "dynamic_linear") -> None:
-        from edge_ai_compression.compression.quantization.dynamic import dynamic_quantize_linear_layers
+        from edge_ai_compression.compression.quantization.dynamic import (
+            dynamic_quantize_linear_layers,
+        )
 
         self.mode = mode
         self._quantize = dynamic_quantize_linear_layers
@@ -139,7 +141,7 @@ class CompressionPipeline:
     def run(
         self,
         model: nn.Module,
-        data: "DataLoader | Any",
+        data: DataLoader | Any,
         *,
         data_dir: str = "data",
         batch_size: int = 128,

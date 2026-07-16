@@ -42,7 +42,9 @@ def _state_dict_size_mb(model: nn.Module) -> float:
     return buf.tell() / (1024 * 1024)
 
 
-def _accuracy_on_loader(model: nn.Module, test_loader: DataLoader, device: str) -> tuple[float, float]:
+def _accuracy_on_loader(
+    model: nn.Module, test_loader: DataLoader, device: str
+) -> tuple[float, float]:
     model = model.to(device)
     model.eval()
     correct = 0
@@ -115,14 +117,19 @@ class ResultLogger:
     @staticmethod
     def log_md(path: str, name: str, row: dict[str, Any]) -> None:
         header = (
-            "| Model | Size (MB) | Latency mean (ms) | p99 (ms) | RAM (MiB) | Accuracy | Energy proxy |\n"
+            "| Model | Size (MB) | Latency mean (ms) | p99 (ms) | "
+            "RAM (MiB) | Accuracy | Energy proxy |\n"
         )
         sep = "|:---|---:|---:|---:|---:|---:|---:|\n"
         line = (
             f"| {name} | {row['size_mb']:.2f} | {row['latency_ms_mean']:.2f} | "
-            f"{row['latency_ms_p99']:.2f} | {row['peak_ram_mib']:.2f} | {row['accuracy']*100:.2f}% | "
+            f"{row['latency_ms_p99']:.2f} | {row['peak_ram_mib']:.2f} | "
+            f"{row['accuracy'] * 100:.2f}% | "
             f"{row['energy_proxy']:.2f} |\n"
         )
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         if not os.path.exists(path):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(header + sep + line)

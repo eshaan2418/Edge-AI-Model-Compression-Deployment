@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import argparse
 
-from edge_ai_compression.optimization.search.bayesian_search import BayesianSearch
 from edge_ai_compression.optimization.scoring.cost_functions import scalarized_objective
+from edge_ai_compression.optimization.search.bayesian_search import BayesianSearch
 
 
 def main() -> None:

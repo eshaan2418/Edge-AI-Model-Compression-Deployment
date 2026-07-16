@@ -10,7 +10,11 @@ import numpy as np
 import torch
 import yaml
 
-from edge_ai_compression.experiment_db.paths import ARTIFACTS_DIR, EXPERIMENTS_CSV, EXPERIMENTS_JSONL
+from edge_ai_compression.experiment_db.paths import (
+    ARTIFACTS_DIR,
+    EXPERIMENTS_CSV,
+    EXPERIMENTS_JSONL,
+)
 from edge_ai_compression.experiment_db.record import EXPERIMENT_CSV_FIELDS, ExperimentRecord
 
 

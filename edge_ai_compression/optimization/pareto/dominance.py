@@ -9,7 +9,11 @@ def dominates(
     metrics_maximize: tuple[str, ...],
     metrics_minimize: tuple[str, ...],
 ) -> bool:
-    """True if a Pareto-dominates b (strict improvement in at least one objective, not worse in any)."""
+    """True if a Pareto-dominates b.
+
+    Dominance means a is not worse than b in any objective and strictly better
+    in at least one.
+    """
     for k in metrics_maximize:
         if float(a[k]) < float(b[k]):
             return False

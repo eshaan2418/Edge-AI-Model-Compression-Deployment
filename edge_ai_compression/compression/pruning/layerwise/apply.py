@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+
 import torch.nn as nn
 import torch.nn.utils.prune as prune
 
@@ -31,10 +33,8 @@ def apply_layerwise_l1_pruning(
     for name, m, pname in _iter_prunable_named(model):
         if name not in sparsities:
             continue
-        try:
+        with contextlib.suppress(ValueError):
             prune.remove(m, pname)
-        except ValueError:
-            pass
     return model
 
 

@@ -70,7 +70,9 @@ def distill_student_inplace(
     for epoch in range(epochs):
         student.train()
         running = 0.0
-        for images, targets in tqdm(train_loader, desc=f"distill {epoch+1}/{epochs}", leave=False):
+        for images, targets in tqdm(
+            train_loader, desc=f"distill {epoch + 1}/{epochs}", leave=False
+        ):
             images = images.to(device)
             targets = targets.to(device)
             with torch.no_grad():
@@ -84,7 +86,7 @@ def distill_student_inplace(
         tr_loss = running / len(train_loader)
         te_loss, te_acc = _eval_accuracy(student, test_loader, device)
         print(
-            f"distill epoch={epoch+1}/{epochs} train_loss={tr_loss:.4f} "
+            f"distill epoch={epoch + 1}/{epochs} train_loss={tr_loss:.4f} "
             f"val_loss={te_loss:.4f} val_acc={te_acc:.4f}"
         )
 

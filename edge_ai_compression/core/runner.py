@@ -18,7 +18,11 @@ from edge_ai_compression.core.pipeline import CompressionPipeline
 from edge_ai_compression.core.registry import ModelRegistry
 from edge_ai_compression.data.loaders import build_loaders
 from edge_ai_compression.experiment_db.record import record_from_run
-from edge_ai_compression.experiment_db.writer import append_csv_row, append_jsonl_line, write_artifacts
+from edge_ai_compression.experiment_db.writer import (
+    append_csv_row,
+    append_jsonl_line,
+    write_artifacts,
+)
 from edge_ai_compression.theory.model_complexity import count_parameters, estimate_flops_macs
 from edge_ai_compression.utils.config_loader import load_yaml
 from edge_ai_compression.utils.logger import append_jsonl
@@ -42,7 +46,11 @@ class ExperimentRunner:
         cfg = self.config
         set_seed(cfg.seed)
         train_loader, test_loader = build_loaders(
-            cfg.dataset, cfg.data_dir, batch_size=cfg.batch_size, num_workers=cfg.num_workers
+            cfg.dataset,
+            cfg.data_dir,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.num_workers,
+            limit_samples=cfg.limit_samples,
         )
 
         model = ModelRegistry.create(cfg.model, num_classes=cfg.num_classes).to(cfg.device)
@@ -126,7 +134,9 @@ class ExperimentRunner:
             if cfg.compression.pruning.enabled
             else "none"
         )
-        pruning_sparsity = float(cfg.compression.pruning.amount) if cfg.compression.pruning.enabled else 0.0
+        pruning_sparsity = (
+            float(cfg.compression.pruning.amount) if cfg.compression.pruning.enabled else 0.0
+        )
 
         result = ExperimentResult(
             accuracy=report.accuracy,

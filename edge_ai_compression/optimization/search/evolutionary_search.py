@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 

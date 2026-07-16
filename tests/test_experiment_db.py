@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import edge_ai_compression.experiment_db.writer as writer_mod
 import numpy as np
 import torch.nn as nn
 
+import edge_ai_compression.experiment_db.writer as writer_mod
 from edge_ai_compression.experiment_db.record import record_from_run
 from edge_ai_compression.experiment_db.writer import append_csv_row, write_artifacts
 

@@ -1,6 +1,10 @@
-from __future__ import annotations
+"""Mobile / NPU execution placeholders.
 
-"""Mobile / NPU execution is device-specific; this module centralizes placeholders for CoreML/TFLite paths."""
+Mobile / NPU execution is device-specific; this module centralizes
+placeholders for CoreML/TFLite export paths.
+"""
+
+from __future__ import annotations
 
 
 class MobileRunner:

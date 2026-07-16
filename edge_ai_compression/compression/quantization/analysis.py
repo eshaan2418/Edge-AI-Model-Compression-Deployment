@@ -14,7 +14,9 @@ def weight_histogram_stats(weight: torch.Tensor) -> dict[str, float]:
         "std": float(np.std(w)),
         "min": float(np.min(w)),
         "max": float(np.max(w)),
-        "sqnr_db_estimate": float(10 * np.log10((np.mean(w**2) + 1e-12) / (np.var(w) * 1e-6 + 1e-12))),
+        "sqnr_db_estimate": float(
+            10 * np.log10((np.mean(w**2) + 1e-12) / (np.var(w) * 1e-6 + 1e-12))
+        ),
     }
 
 

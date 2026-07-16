@@ -16,5 +16,7 @@ def estimate_energy_proxy(latency_ms_mean: float, model_size_mb: float) -> Energ
     score = latency_ms_mean * 0.6 + model_size_mb * 0.4
     return EnergyEstimate(
         score=float(score),
-        notes="Unitless proxy; calibrate with on-device power measurement for research-grade numbers.",
+        notes=(
+            "Unitless proxy; calibrate with on-device power measurement for research-grade numbers."
+        ),
     )

@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from typing import Tuple
-
 import torchvision
-from torchvision import transforms
 from torch.utils.data import Dataset
+from torchvision import transforms
 
 
-def get_cifar10_datasets(data_dir: str) -> Tuple[Dataset, Dataset]:
+def get_cifar10_datasets(data_dir: str) -> tuple[Dataset, Dataset]:
     """Return CIFAR-10 train and test datasets with standard transforms."""
     mean = (0.4914, 0.4822, 0.4465)
     std = (0.2023, 0.1994, 0.2010)

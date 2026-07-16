@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -26,15 +25,21 @@ class DistillConfig:
     teacher_ckpt: str = "models/baseline_resnet18.pt"
 
 
-def kd_loss_fn(student_logits: torch.Tensor, teacher_logits: torch.Tensor, targets: torch.Tensor, temperature: float, alpha: float) -> torch.Tensor:
+def kd_loss_fn(
+    student_logits: torch.Tensor,
+    teacher_logits: torch.Tensor,
+    targets: torch.Tensor,
+    temperature: float,
+    alpha: float,
+) -> torch.Tensor:
     ce = nn.functional.cross_entropy(student_logits, targets)
     log_p = nn.functional.log_softmax(student_logits / temperature, dim=1)
     q = nn.functional.softmax(teacher_logits / temperature, dim=1)
-    kd = nn.functional.kl_div(log_p, q, reduction="batchmean") * (temperature ** 2)
+    kd = nn.functional.kl_div(log_p, q, reduction="batchmean") * (temperature**2)
     return alpha * kd + (1 - alpha) * ce
 
 
-def evaluate(model: nn.Module, loader: DataLoader, device: str) -> Tuple[float, float]:
+def evaluate(model: nn.Module, loader: DataLoader, device: str) -> tuple[float, float]:
     model.eval()
     criterion = nn.CrossEntropyLoss()
     running_loss = 0.0
@@ -52,7 +57,8 @@ def evaluate(model: nn.Module, loader: DataLoader, device: str) -> Tuple[float, 
     return running_loss / n, running_acc / n
 
 
-def run_distillation(cfg: DistillConfig = DistillConfig()) -> None:
+def run_distillation(cfg: DistillConfig | None = None) -> None:
+    cfg = cfg or DistillConfig()
     device = cfg.device
     train_ds, test_ds = get_cifar10_datasets(cfg.data_dir)
     train_loader = DataLoader(train_ds, batch_size=cfg.batch_size, shuffle=True, num_workers=2)
@@ -64,12 +70,14 @@ def run_distillation(cfg: DistillConfig = DistillConfig()) -> None:
     teacher.eval()
 
     student = create_model().to(device)
-    optimizer = optim.SGD(student.parameters(), lr=cfg.lr, momentum=0.9, weight_decay=cfg.weight_decay)
+    optimizer = optim.SGD(
+        student.parameters(), lr=cfg.lr, momentum=0.9, weight_decay=cfg.weight_decay
+    )
 
     for epoch in range(cfg.num_epochs):
         student.train()
         running_loss = 0.0
-        for images, targets in tqdm(train_loader, desc=f"distill e{epoch+1}", leave=False):
+        for images, targets in tqdm(train_loader, desc=f"distill e{epoch + 1}", leave=False):
             images = images.to(device)
             targets = targets.to(device)
 
@@ -84,7 +92,10 @@ def run_distillation(cfg: DistillConfig = DistillConfig()) -> None:
             running_loss += loss.item()
         tr_loss = running_loss / len(train_loader)
         te_loss, te_acc = evaluate(student, test_loader, device)
-        print(f"epoch={epoch+1}/{cfg.num_epochs} train_loss={tr_loss:.4f} val_loss={te_loss:.4f} val_acc={te_acc:.4f}")
+        print(
+            f"epoch={epoch + 1}/{cfg.num_epochs} train_loss={tr_loss:.4f} "
+            f"val_loss={te_loss:.4f} val_acc={te_acc:.4f}"
+        )
 
     torch.save({"model_state": student.state_dict()}, "models/student_kd.pt")
     print("Saved student model to models/student_kd.pt")

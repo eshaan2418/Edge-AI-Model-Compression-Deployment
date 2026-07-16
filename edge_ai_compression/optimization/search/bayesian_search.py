@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 from sklearn.gaussian_process import GaussianProcessRegressor
@@ -58,7 +59,9 @@ class BayesianSearch:
         assert best_cfg is not None
         return best_cfg
 
-    def update_model(self, cfg: dict[str, Any], result: dict[str, Any], score_key: str = "score") -> None:
+    def update_model(
+        self, cfg: dict[str, Any], result: dict[str, Any], score_key: str = "score"
+    ) -> None:
         self._xs.append(self._encode(cfg))
         self._ys.append(float(result[score_key]))
 

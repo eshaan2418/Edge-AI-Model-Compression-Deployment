@@ -1,7 +1,10 @@
-name: model-compression-cifar10
+name: edge-ai-compression
+channels:
+  - conda-forge
 dependencies:
-  - python=3.10
+  - python=3.11
   - pip
   - pip:
-      - -r requirements.txt
-      - -e .
+      # Full environment: PyTorch framework + TensorFlow scripts + viz + dev.
+      # Dependency versions are declared in pyproject.toml.
+      - -e .[all]

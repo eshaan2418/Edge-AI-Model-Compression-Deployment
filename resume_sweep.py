@@ -10,6 +10,5 @@ if str(ROOT) not in sys.path:
 
 from edge_ai_compression.experiments.resume_sweep import main  # noqa: E402
 
-
 if __name__ == "__main__":
     main()

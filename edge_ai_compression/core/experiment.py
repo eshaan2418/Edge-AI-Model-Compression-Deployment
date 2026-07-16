@@ -74,7 +74,7 @@ class CompressionConfig:
 
 def dataset_num_classes(name: str) -> int:
     n = name.lower()
-    if n == "cifar10":
+    if n in ("cifar10", "fake", "synthetic", "debug", "random"):
         return 10
     if n == "cifar100":
         return 100
@@ -92,6 +92,7 @@ class ExperimentConfig:
     num_workers: int = 2
     device: str = "cpu"
     seed: int = 42
+    limit_samples: int | None = None
     checkpoint_in: str | None = None
     checkpoint_out: str = "models/compressed.pt"
     compression: CompressionConfig = field(default_factory=CompressionConfig)
@@ -113,10 +114,7 @@ class ExperimentConfig:
             order = parse_order(str(d["compression_order_tag"]))
         elif d.get("compression_order"):
             raw = d["compression_order"]
-            if isinstance(raw, str):
-                order = parse_order(raw)
-            else:
-                order = [str(x) for x in raw]
+            order = parse_order(raw) if isinstance(raw, str) else [str(x) for x in raw]
         else:
             order = ["distill", "prune", "quantize"]
         return ExperimentConfig(
@@ -127,6 +125,7 @@ class ExperimentConfig:
             num_workers=int(d.get("num_workers", 2)),
             device=str(d.get("device", "cpu")),
             seed=int(d.get("seed", 42)),
+            limit_samples=(int(d["limit_samples"]) if d.get("limit_samples") is not None else None),
             checkpoint_in=d.get("checkpoint_in"),
             checkpoint_out=str(d.get("checkpoint_out", "models/compressed.pt")),
             compression=comp,

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Multi-objective compression search / Pareto reporting (Phase 6)."""
+
 from __future__ import annotations
 
 import argparse
@@ -14,7 +15,11 @@ from edge_ai_compression.optimization.pareto.frontier import ParetoOptimizer
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--objective", default="pareto", choices=["pareto", "scalar"])
-    p.add_argument("--metrics", nargs="+", default=["accuracy", "latency_mean", "size_mb", "ram_mb"])
+    p.add_argument(
+        "--metrics",
+        nargs="+",
+        default=["accuracy", "latency_mean", "size_mb", "ram_mb"],
+    )
     p.add_argument("--results", type=Path, default=Path("results/experiments.csv"))
     p.add_argument("--out", type=Path, default=Path("results/pareto_frontier.json"))
     args = p.parse_args()

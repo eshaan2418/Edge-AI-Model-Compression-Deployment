@@ -59,11 +59,16 @@ results/sweeps/
 results/plots/
 results/surrogates/
 
-# Data and models (keep large/generated out of git)
-data/
-!data/README.md
-models/
-!models/README.md
+# Data and models (keep large/generated out of git).
+# Anchored to the repo root so the source packages edge_ai_compression/data/
+# and edge_ai_compression/models/ are NOT ignored. Ignoring the directory
+# *contents* (/*) rather than the directory itself lets the README
+# placeholders be re-included (git can't un-ignore a file whose parent dir is
+# ignored).
+/data/*
+!/data/README.md
+/models/*
+!/models/README.md
 
 # IDEs
 .vscode/

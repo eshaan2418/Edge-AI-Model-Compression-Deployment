@@ -1,7 +1,11 @@
+import argparse
 import os
-import tensorflow as tf
-import numpy as np
 
+# Use the legacy Keras 2 backend (SavedModel directories). Requires `tf-keras`.
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "1")
+
+import numpy as np  # noqa: E402
+import tensorflow as tf  # noqa: E402
 
 # --- Configuration ---
 PRUNED_MODEL_PATH = "models/pruned_model"
@@ -35,19 +39,28 @@ def main():
     Orchestrate the combined pruning + quantization workflow.
     This step initializes a TFLiteConverter from the fine‑tuned pruned model.
     """
+    p = argparse.ArgumentParser(
+        description="Combine pruning + full-integer quantization to TFLite."
+    )
+    p.add_argument("--pruned", default=PRUNED_MODEL_PATH)
+    p.add_argument("--out", default=COMBINED_OPTIMIZED_MODEL_PATH)
+    p.add_argument("--num-calibration-samples", type=int, default=200)
+    args = p.parse_args()
+    pruned_path = args.pruned
+
     print("--- Starting Combined Pruning & Quantization Workflow ---\n")
 
-    if not os.path.exists(PRUNED_MODEL_PATH):
-        print(f"Error: Pruned model not found at {PRUNED_MODEL_PATH}")
+    if not os.path.exists(pruned_path):
+        print(f"Error: Pruned model not found at {pruned_path}")
         print("Please run the pruning workflow first to generate this model.")
         return
 
-    print(f"Targeting pruned model for conversion at: {PRUNED_MODEL_PATH}")
+    print(f"Targeting pruned model for conversion at: {pruned_path}")
 
     # Initialize TFLiteConverter directly from SavedModel on disk
     print("\n[TASK] Initializing the TFLiteConverter...")
     try:
-        converter = tf.lite.TFLiteConverter.from_saved_model(PRUNED_MODEL_PATH)
+        converter = tf.lite.TFLiteConverter.from_saved_model(pruned_path)
         print("TFLiteConverter initialized successfully from the pruned model.")
         print(f"Converter object created: {converter}")
     except Exception as e:
@@ -57,7 +70,11 @@ def main():
     # Prepare representative dataset for full integer quantization calibration
     print("\n[TASK] Creating the representative dataset for calibration...")
     train_images = load_training_data()
-    representative_dataset = lambda: representative_dataset_generator(train_images, 200)
+    n_samples = args.num_calibration_samples
+
+    def representative_dataset():
+        return representative_dataset_generator(train_images, n_samples)
+
     print("Representative dataset generator created successfully.")
     print("This generator is now ready to be used for full integer quantization calibration.")
 
@@ -78,16 +95,14 @@ def main():
         print(f"An error occurred during conversion: {e}")
         return
 
-    os.makedirs(os.path.dirname(COMBINED_OPTIMIZED_MODEL_PATH), exist_ok=True)
-    with open(COMBINED_OPTIMIZED_MODEL_PATH, "wb") as f:
+    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    with open(args.out, "wb") as f:
         f.write(tflite_model_combined)
 
-    combined_size_mb = os.path.getsize(COMBINED_OPTIMIZED_MODEL_PATH) / (1024 * 1024)
-    print(f"Final combined-optimization model saved to: {COMBINED_OPTIMIZED_MODEL_PATH}")
+    combined_size_mb = os.path.getsize(args.out) / (1024 * 1024)
+    print(f"Final combined-optimization model saved to: {args.out}")
     print(f"Combined Pruned + Quantized TFLite model size: {combined_size_mb:.2f} MB")
 
 
 if __name__ == "__main__":
     main()
-
-

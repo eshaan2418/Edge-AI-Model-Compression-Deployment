@@ -22,16 +22,24 @@ dependencies = [
     "psutil>=5.9",
 ]
 
+# TensorFlow/Keras stack for the original root scripts (train_baseline.py,
+# benchmark.py, quantize_model.py, distill_model.py). Not needed for the
+# PyTorch framework or the test suite. `tf-mot` adds the pruning toolkit used
+# by prune_model.py.
 [project.optional-dependencies]
-tf = ["tensorflow>=2.15", "keras>=3.0"]
+tf = ["tensorflow>=2.16", "tf-keras>=2.16"]
+tf-mot = ["tensorflow>=2.16", "tf-keras>=2.16", "tensorflow-model-optimization>=0.8"]
 viz = ["matplotlib>=3.8"]
+dev = ["pytest>=7.4", "ruff>=0.4"]
+all = ["edge-ai-compression[tf-mot,viz,dev]"]
 
 [project.scripts]
 auto-compress = "edge_ai_compression.auto_compress:main"
+mc = "src.model_compression.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["edge_ai_compression*"]
+include = ["edge_ai_compression*", "src*"]
 
 [tool.black]
 line-length = 100
@@ -39,9 +47,12 @@ target-version = ["py310"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = []
 
 [tool.pytest.ini_options]
 addopts = "-q"
 pythonpath = ["."]
+testpaths = ["tests"]

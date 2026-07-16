@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 class RandomSearch:
@@ -20,5 +21,7 @@ class RandomSearch:
                 cfg[k] = random.uniform(float(lo), float(hi))
         return cfg
 
-    def run(self, budget: int, objective: Callable[[dict[str, Any]], dict[str, Any]]) -> list[dict[str, Any]]:
+    def run(
+        self, budget: int, objective: Callable[[dict[str, Any]], dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         return [objective(self.sample()) for _ in range(budget)]

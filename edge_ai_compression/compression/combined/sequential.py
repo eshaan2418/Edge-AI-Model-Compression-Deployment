@@ -23,4 +23,6 @@ class SequentialCompression:
         batch_size: int,
         device: str,
     ) -> nn.Module:
-        return self._pipeline.run(model, data, data_dir=data_dir, batch_size=batch_size, device=device)
+        return self._pipeline.run(
+            model, data, data_dir=data_dir, batch_size=batch_size, device=device
+        )

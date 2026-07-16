@@ -1,10 +1,10 @@
-from __future__ import annotations
-
-"""Phase 12 — pruning mode registry (structured / movement / lottery hooks).
+"""Pruning mode registry (structured / movement / lottery hooks).
 
 Unstructured magnitude and layerwise adaptive are implemented under
 ``compression.pruning``; additional modes are extension points.
 """
+
+from __future__ import annotations
 
 from enum import Enum
 

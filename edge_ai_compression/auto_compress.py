@@ -34,9 +34,7 @@ class AutoCompressor:
             return False
         if r["size_mb"] > self.max_size_mb:
             return False
-        if self.max_ram_mib is not None and r["peak_ram_mib"] > self.max_ram_mib:
-            return False
-        return True
+        return not (self.max_ram_mib is not None and r["peak_ram_mib"] > self.max_ram_mib)
 
     def score(self, r: dict) -> float:
         return scalarized_objective(r)
@@ -104,7 +102,10 @@ def main() -> None:
 
     print("--- Auto-compress summary ---")
     for i, r in enumerate(results):
-        print(f"trial {i}: acc={r['accuracy']:.3f} lat={r['latency_ms_mean']:.2f}ms size={r['size_mb']:.2f}MB")
+        print(
+            f"trial {i}: acc={r['accuracy']:.3f} "
+            f"lat={r['latency_ms_mean']:.2f}ms size={r['size_mb']:.2f}MB"
+        )
     print(f"Pareto frontier size: {len(pareto)}")
     if best:
         print(f"Best feasible by scalarized score: {best}")

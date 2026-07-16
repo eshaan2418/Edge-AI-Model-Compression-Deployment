@@ -8,7 +8,9 @@ from torch.utils.data import DataLoader
 
 
 class FailureAnalyzer:
-    def compare(self, baseline: nn.Module, compressed: nn.Module, loader: DataLoader, device: str) -> dict[str, Any]:
+    def compare(
+        self, baseline: nn.Module, compressed: nn.Module, loader: DataLoader, device: str
+    ) -> dict[str, Any]:
         baseline.eval()
         compressed.eval()
         mismatches = 0

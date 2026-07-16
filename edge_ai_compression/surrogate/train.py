@@ -27,7 +27,9 @@ def train_surrogates(
     out_dir.mkdir(parents=True, exist_ok=True)
     df = load_experiment_table(csv_path)
     X, ys = build_xy(df)
-    Y = np.column_stack([ys[k] for k in ("accuracy", "latency_mean", "size_mb", "ram_mb", "energy_proxy")])
+    Y = np.column_stack(
+        [ys[k] for k in ("accuracy", "latency_mean", "size_mb", "ram_mb", "energy_proxy")]
+    )
     meta: dict[str, Any] = {"n_rows": len(df), "targets": list(ys.keys())}
 
     if "rf" in model_types:

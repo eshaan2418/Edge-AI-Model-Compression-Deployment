@@ -1,47 +1,11 @@
-absl-py==2.3.1
-astunparse==1.6.3
-certifi==2025.8.3
-charset-normalizer==3.4.3
-contourpy==1.3.3
-cycler==0.12.1
-flatbuffers==25.9.23
-fonttools==4.60.1
-gast==0.6.0
-google-pasta==0.2.0
-grpcio==1.75.1
-h5py==3.14.0
-idna==3.10
-keras==3.11.3
-kiwisolver==1.4.9
-libclang==18.1.1
-Markdown==3.9
-markdown-it-py==4.0.0
-MarkupSafe==3.0.3
-matplotlib==3.10.6
-mdurl==0.1.2
-memory-profiler==0.61.0
-ml_dtypes==0.5.3
-namex==0.1.0
-numpy==2.3.3
-opt_einsum==3.4.0
-optree==0.17.0
-packaging==25.0
-pillow==11.3.0
-protobuf==6.32.1
-psutil==7.1.0
-Pygments==2.19.2
-pyparsing==3.2.5
-python-dateutil==2.9.0.post0
-requests==2.32.5
-rich==14.1.0
-setuptools==80.9.0
-six==1.17.0
-tensorboard==2.20.0
-tensorboard-data-server==0.7.2
-tensorflow==2.20.0
-termcolor==3.1.0
-typing_extensions==4.15.0
-urllib3==2.5.0
-Werkzeug==3.1.3
-wheel==0.45.1
-wrapt==1.17.3
+# Dependencies are declared in pyproject.toml (single source of truth).
+# This file installs the PyTorch framework plus the test/lint tooling — enough
+# to run `pytest` and every entrypoint under edge_ai_compression/ and src/.
+#
+# For the original TensorFlow/Keras scripts (train_baseline.py, benchmark.py,
+# quantize_model.py, distill_model.py) also install the `tf` extra:
+#     pip install -e ".[tf]"       # TensorFlow + Keras
+#     pip install -e ".[tf-mot]"   # adds the pruning toolkit for prune_model.py
+# For plotting: pip install -e ".[viz]"
+# For everything at once: pip install -e ".[all]"
+-e .[dev]

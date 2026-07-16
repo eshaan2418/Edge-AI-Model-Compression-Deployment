@@ -20,8 +20,12 @@ def _run_variant(base_path: Path, variant: dict[str, object], sweep_id: str) -> 
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Launch compression sweep (sequential runner; Phase 14)")
-    p.add_argument("--config", type=Path, required=True, help="Sweep YAML with base_config and variants")
+    p = argparse.ArgumentParser(
+        description="Launch compression sweep (sequential runner; Phase 14)"
+    )
+    p.add_argument(
+        "--config", type=Path, required=True, help="Sweep YAML with base_config and variants"
+    )
     args = p.parse_args()
     spec = yaml.safe_load(args.config.read_text(encoding="utf-8"))
     base = Path(spec["base_config"])

@@ -1,0 +1,26 @@
+# Fast, fully offline CPU smoke test: synthetic data + light benchmarking.
+# Uses the `fake` dataset (random CIFAR-shaped tensors) so it needs NO network
+# and NO 170 MB CIFAR-10 download — the full pipeline (prune -> eval -> log)
+# completes in seconds. Swap `dataset: cifar10` for a real experiment.
+model: resnet18_cifar
+dataset: fake
+data_dir: data
+batch_size: 32
+num_workers: 0
+device: cpu
+seed: 42
+limit_samples: 64
+checkpoint_out: models/smoke_compressed.pt
+compression:
+  pruning:
+    enabled: true
+    amount: 0.5
+  quantization:
+    enabled: false
+  distillation:
+    enabled: false
+benchmark:
+  latency_repeats: 5
+  latency_warmup: 1
+  results_md: edge_ai_compression/results/benchmark_append.md
+  results_jsonl: edge_ai_compression/results/runs.jsonl

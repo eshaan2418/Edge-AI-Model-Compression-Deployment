@@ -1,17 +1,25 @@
 from __future__ import annotations
 
 import argparse
+
 import torch
 
-from .train import main as train_main, TrainConfig
+from .distillation import DistillConfig, run_distillation
 from .models import create_model
 from .pruning import apply_global_unstructured_pruning, remove_pruning_reparametrization
 from .quantization import dynamic_quantize_linear_layers
-from .distillation import run_distillation, DistillConfig
+from .train import TrainConfig
+from .train import main as train_main
 
 
 def _cmd_train(args: argparse.Namespace) -> None:
-    cfg = TrainConfig(data_dir=args.data_dir, batch_size=args.batch_size, num_epochs=args.epochs, lr=args.lr)
+    cfg = TrainConfig(
+        data_dir=args.data_dir,
+        batch_size=args.batch_size,
+        num_epochs=args.epochs,
+        lr=args.lr,
+        max_batches=args.max_batches,
+    )
     train_main(cfg)
 
 
@@ -55,6 +63,12 @@ def build_parser() -> argparse.ArgumentParser:
     pt.add_argument("--batch-size", type=int, default=128)
     pt.add_argument("--epochs", type=int, default=1)
     pt.add_argument("--lr", type=float, default=0.1)
+    pt.add_argument(
+        "--max-batches",
+        type=int,
+        default=None,
+        help="Cap batches per train/eval loop for a fast smoke test.",
+    )
     pt.set_defaults(func=_cmd_train)
 
     # prune

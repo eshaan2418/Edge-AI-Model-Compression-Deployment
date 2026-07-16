@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Iterable
+import contextlib
+from collections.abc import Iterable
 
 import torch.nn as nn
 import torch.nn.utils.prune as prune
@@ -26,8 +27,6 @@ def apply_global_unstructured_pruning(model: nn.Module, amount: float = 0.5) -> 
 
 def remove_pruning_reparametrization(model: nn.Module) -> nn.Module:
     for module, name in _iter_prunable_modules(model):
-        try:
+        with contextlib.suppress(ValueError):
             prune.remove(module, name)
-        except ValueError:
-            pass
     return model

@@ -8,4 +8,7 @@ class RaspberryPiProfile:
         self.threads = threads
 
     def describe(self) -> str:
-        return f"ARM CPU inference profile (threads={self.threads}); export to TorchScript/ONNX for edge serving."
+        return (
+            f"ARM CPU inference profile (threads={self.threads}); "
+            "export to TorchScript/ONNX for edge serving."
+        )
