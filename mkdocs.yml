@@ -1,0 +1,12 @@
+site_name: Edge AI Model Compression & Deployment
+site_description: Hardware-aware neural network compression for edge devices.
+docs_dir: docs
+theme:
+  name: readthedocs
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+  - Experiments: experiments.md
+  - Analysis: analysis.md
+  - Deployment: deployment.md
+  - Recruiter demo: recruiter_demo.md

@@ -16,5 +16,6 @@ def compute_latency_stats(latencies_ms: list[float] | np.ndarray) -> dict[str, f
         "std": float(np.std(arr)),
         "p50": float(np.percentile(arr, 50)),
         "p90": float(np.percentile(arr, 90)),
+        "p95": float(np.percentile(arr, 95)),
         "p99": float(np.percentile(arr, 99)),
     }

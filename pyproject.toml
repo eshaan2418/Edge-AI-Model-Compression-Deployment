@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Hardware-aware neural network compression and AutoML for edge deployment"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Eshaan Kapooswalla" }]
 dependencies = [
     "numpy>=1.24",
     "torch>=2.0",
@@ -30,8 +32,9 @@ dependencies = [
 tf = ["tensorflow>=2.16", "tf-keras>=2.16"]
 tf-mot = ["tensorflow>=2.16", "tf-keras>=2.16", "tensorflow-model-optimization>=0.8"]
 viz = ["matplotlib>=3.8"]
-dev = ["pytest>=7.4", "ruff>=0.4"]
-all = ["edge-ai-compression[tf-mot,viz,dev]"]
+docs = ["mkdocs>=1.6"]
+dev = ["pytest>=7.4", "ruff>=0.4", "hypothesis>=6"]
+all = ["edge-ai-compression[tf-mot,viz,docs,dev]"]
 
 [project.scripts]
 auto-compress = "edge_ai_compression.auto_compress:main"
