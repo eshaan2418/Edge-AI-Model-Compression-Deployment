@@ -33,7 +33,7 @@ tf = ["tensorflow>=2.16", "tf-keras>=2.16"]
 tf-mot = ["tensorflow>=2.16", "tf-keras>=2.16", "tensorflow-model-optimization>=0.8"]
 viz = ["matplotlib>=3.8"]
 docs = ["mkdocs>=1.6"]
-dev = ["pytest>=7.4", "ruff>=0.4"]
+dev = ["pytest>=7.4", "ruff>=0.4", "hypothesis>=6"]
 all = ["edge-ai-compression[tf-mot,viz,docs,dev]"]
 
 [project.scripts]
