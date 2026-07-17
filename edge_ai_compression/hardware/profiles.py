@@ -4,6 +4,12 @@ Each profile encodes the constraints a compressed model must satisfy to be
 deployable on that target. Numbers are deliberate, documented *order-of-
 magnitude* budgets for planning and scoring — not measured device limits. Real
 deployment should confirm them on the actual hardware.
+
+The optional ``peak_gflops`` / ``mem_bandwidth_gbs`` fields are **nominal
+vendor-spec ceilings** (theoretical peak FP32 throughput and memory bandwidth),
+used only for roofline planning (see ``theory.roofline``). They are ceilings no
+real workload reaches, not measurements — treat them as order-of-magnitude
+planning numbers exactly like the budget fields.
 """
 
 from __future__ import annotations
@@ -22,6 +28,8 @@ class HardwareProfile:
         max_ram_mb: Upper bound on peak inference RAM.
         preferred_export_format: Recommended export target for this device.
         notes: Human-readable context for the budget choices.
+        peak_gflops: Nominal peak FP32 throughput (GFLOP/s), or None if unknown.
+        mem_bandwidth_gbs: Nominal peak memory bandwidth (GB/s), or None.
     """
 
     name: str
@@ -30,6 +38,8 @@ class HardwareProfile:
     max_ram_mb: float
     preferred_export_format: str
     notes: str
+    peak_gflops: float | None = None
+    mem_bandwidth_gbs: float | None = None
 
 
 # Documented planning budgets. See module docstring re: these being budgets,
@@ -42,6 +52,8 @@ PROFILES: dict[str, HardwareProfile] = {
         max_ram_mb=4096.0,
         preferred_export_format="torchscript",
         notes="Laptop/server class x86 CPU. Generous budget; useful as a baseline.",
+        peak_gflops=150.0,
+        mem_bandwidth_gbs=40.0,
     ),
     "raspberry_pi": HardwareProfile(
         name="raspberry_pi",
@@ -50,6 +62,8 @@ PROFILES: dict[str, HardwareProfile] = {
         max_ram_mb=512.0,
         preferred_export_format="onnx",
         notes="ARM Cortex-A class SBC (e.g. Pi 4). ONNX Runtime / TFLite recommended.",
+        peak_gflops=10.0,
+        mem_bandwidth_gbs=4.0,
     ),
     "smartphone": HardwareProfile(
         name="smartphone",
@@ -58,6 +72,8 @@ PROFILES: dict[str, HardwareProfile] = {
         max_ram_mb=1024.0,
         preferred_export_format="tflite",
         notes="Mobile SoC with NNAPI/CoreML delegates; tight latency for interactivity.",
+        peak_gflops=50.0,
+        mem_bandwidth_gbs=25.0,
     ),
     "microcontroller_sim": HardwareProfile(
         name="microcontroller_sim",
@@ -66,6 +82,8 @@ PROFILES: dict[str, HardwareProfile] = {
         max_ram_mb=0.5,
         preferred_export_format="tflite_micro",
         notes="Simulated MCU (e.g. Cortex-M). KB-scale RAM; only tiny models fit.",
+        peak_gflops=0.1,
+        mem_bandwidth_gbs=0.5,
     ),
 }
 

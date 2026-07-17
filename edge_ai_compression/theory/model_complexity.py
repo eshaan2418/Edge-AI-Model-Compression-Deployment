@@ -94,3 +94,50 @@ def estimate_flops_macs(model: nn.Module, input_shape: tuple[int, int, int, int]
     for h in handles:
         h.remove()
     return float(hook.total)
+
+
+def weight_bytes(model: nn.Module, *, dtype_bytes: int = 4) -> float:
+    """Total bytes occupied by the model's parameters at ``dtype_bytes`` each.
+
+    Defaults to 4 bytes (FP32). Pass 1 for int8 to reason about a quantized model.
+    """
+    return float(count_parameters(model) * dtype_bytes)
+
+
+def estimate_activation_bytes(
+    model: nn.Module,
+    input_shape: tuple[int, int, int, int],
+    *,
+    dtype_bytes: int = 4,
+) -> float:
+    """Estimate bytes of intermediate activations produced in one forward pass.
+
+    Sums the output-tensor sizes of every leaf module (the tensors a naive
+    executor would materialize). This is an upper-ish estimate of activation
+    memory traffic — real runtimes fuse and reuse buffers — but it is the right
+    order of magnitude for roofline / arithmetic-intensity reasoning.
+    """
+    device = next(model.parameters()).device
+    dtype = next(model.parameters()).dtype
+    total = 0
+
+    def hook(_mod, _inp, out) -> None:
+        nonlocal total
+        tensors = out if isinstance(out, (tuple, list)) else [out]
+        for t in tensors:
+            if isinstance(t, torch.Tensor):
+                total += t.numel()
+
+    handles = []
+    for m in model.modules():
+        # Leaf modules only (no children) — avoids double-counting containers.
+        if len(list(m.children())) == 0:
+            handles.append(m.register_forward_hook(hook))
+
+    dummy = torch.zeros(input_shape, device=device, dtype=dtype)
+    model.eval()
+    with torch.no_grad():
+        model(dummy)
+    for h in handles:
+        h.remove()
+    return float(total * dtype_bytes)
