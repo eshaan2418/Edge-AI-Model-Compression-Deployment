@@ -243,6 +243,10 @@ Standalone, offline tools — all support `--help`:
 | `python -m edge_ai_compression.benchmarking.benchmark_model --model resnet18_cifar` | Benchmark a model on synthetic input (latency percentiles, size, params, FLOPs, RAM) → JSON. |
 | `python -m edge_ai_compression.analysis.pareto --results results/experiments.csv --out results/pareto` | Pareto frontier over logged runs → `pareto_frontier.csv/.md` (`--plot` optional). |
 | `python -m edge_ai_compression.analysis.search_space --config configs/sweeps/full_compression_study.yml` | Summarize a sweep's candidate count and dimensions before running it. |
+| `python -m edge_ai_compression.benchmarking.ab_compare --model-a small_cnn_student --model-b resnet18_cifar` | Statistically compare two models' latency: bootstrap CIs, Mann–Whitney U, Cliff's delta, and a significance verdict. |
+| `python -m edge_ai_compression.theory.roofline --model resnet18_cifar --profile raspberry_pi` | Roofline / arithmetic-intensity analysis: compute- vs memory-bound, ridge point, theoretical latency floor. |
+| `python -m edge_ai_compression.analysis.layer_sensitivity --model small_cnn_student --method prune --amount 0.5` | Per-layer sensitivity: output drift when each layer alone is pruned/quantized, ranked to guide non-uniform compression. |
+| `python -m edge_ai_compression.optimization.indicators --results results/experiments.csv` | Score a Pareto front: hypervolume, additive epsilon-indicator, and Schott spacing. |
 | `python -m edge_ai_compression.hardware.score --metrics results/benchmark.json --profile raspberry_pi` | Score metrics against a single device budget (feasibility, utilization, violations). |
 | `python -m edge_ai_compression.hardware.compare --metrics results/demo/report.json` | Rank one model's metrics against every hardware profile (feasible-first, scored). |
 | `python -m edge_ai_compression.config.validate <config.yml> [--strict]` | Validate an experiment config against the runner schema (registry-checked model/dataset). |

@@ -7,5 +7,6 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Experiments: experiments.md
+  - Analysis: analysis.md
   - Deployment: deployment.md
   - Recruiter demo: recruiter_demo.md

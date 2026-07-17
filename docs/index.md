@@ -21,6 +21,7 @@ then writes `report.json` / `report.md` you can feed to the reporting tools belo
 | ----- | -------------- |
 | [Architecture](architecture.md) | How the framework is structured: registry, pipeline stages, experiment DB, Pareto search. |
 | [Experiments](experiments.md) | Running compression experiments, sweeps, and search spaces. |
+| [Analysis](analysis.md) | Statistical latency A/B testing, roofline analysis, layer sensitivity, and Pareto quality indicators — with their honesty caveats. |
 | [Deployment](deployment.md) | Hardware-aware feasibility scoring, profile comparison, and honest export tooling. |
 | [Recruiter demo](recruiter_demo.md) | A 60-second guided tour of what this project demonstrates. |
 
@@ -35,6 +36,10 @@ Every CLI supports `--help`. Common ones:
 | `python -m edge_ai_compression.recipes.list` | List built-in compression recipes. |
 | `python -m edge_ai_compression.recipes.apply --recipe <name> --config <base>` | Merge a recipe into a base config. |
 | `python -m edge_ai_compression.analysis.search_space --config <sweep>` | Summarize a sweep's candidate count and dimensions. |
+| `python -m edge_ai_compression.benchmarking.ab_compare --model-a <a> --model-b <b>` | Statistically compare two models' latency (bootstrap CIs, Mann–Whitney U, Cliff's delta, verdict). |
+| `python -m edge_ai_compression.theory.roofline --model <m> --profile <p>` | Roofline / arithmetic-intensity analysis and theoretical latency floor. |
+| `python -m edge_ai_compression.analysis.layer_sensitivity --model <m> --method prune` | Rank layers by output drift under per-layer pruning/quantization. |
+| `python -m edge_ai_compression.optimization.indicators --results <csv>` | Score a Pareto front (hypervolume, epsilon-indicator, spacing). |
 | `python -m edge_ai_compression.hardware.compare --metrics <report>` | Rank a model against all hardware profiles. |
 | `python -m edge_ai_compression.reporting.generate_report --demo <report>` | Build a single-file HTML report. |
 | `python -m edge_ai_compression.reporting.model_card --metrics <report>` | Generate an honest Markdown model card. |
