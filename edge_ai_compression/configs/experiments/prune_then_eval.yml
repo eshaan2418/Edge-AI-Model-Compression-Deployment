@@ -16,6 +16,11 @@ compression:
   distillation:
     enabled: false
 benchmark:
-  latency_repeats: 30
-  results_md: edge_ai_compression/results/benchmark_append.md
-  results_jsonl: edge_ai_compression/results/runs.jsonl
+  batch_size: 1
+  num_threads: 4
+  warmup_iters: 50
+  min_warmup_s: 1.0
+  iters: 1000
+  min_time_s: 0.0
+  process_repeats: 5
+  strict_environment: true

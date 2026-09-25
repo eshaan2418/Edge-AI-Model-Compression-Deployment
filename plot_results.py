@@ -24,8 +24,8 @@ def main() -> None:
     df = pd.read_csv(args.results)
     args.out.mkdir(parents=True, exist_ok=True)
     plt.figure(figsize=(5, 4))
-    plt.scatter(df["latency_mean"], df["accuracy"], alpha=0.7)
-    plt.xlabel("Latency mean (ms)")
+    plt.scatter(df["latency_median"], df["accuracy"], alpha=0.7)
+    plt.xlabel("Latency, median of process medians (ms)")
     plt.ylabel("Accuracy")
     p = args.out / "pareto_accuracy_latency.png"
     plt.tight_layout()

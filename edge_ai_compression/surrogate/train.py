@@ -14,7 +14,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from edge_ai_compression.surrogate.dataset import build_xy, load_experiment_table
+from edge_ai_compression.surrogate.dataset import TARGETS, build_xy, load_experiment_table
 
 
 def train_surrogates(
@@ -27,9 +27,7 @@ def train_surrogates(
     out_dir.mkdir(parents=True, exist_ok=True)
     df = load_experiment_table(csv_path)
     X, ys = build_xy(df)
-    Y = np.column_stack(
-        [ys[k] for k in ("accuracy", "latency_mean", "size_mb", "ram_mb", "energy_proxy")]
-    )
+    Y = np.column_stack([ys[k] for k in TARGETS])
     meta: dict[str, Any] = {"n_rows": len(df), "targets": list(ys.keys())}
 
     if "rf" in model_types:

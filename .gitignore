@@ -53,7 +53,7 @@ logs/
 *.log
 
 # Framework run outputs
-edge_ai_compression/results/
+results/smoke/
 results/artifacts/
 results/sweeps/
 results/plots/

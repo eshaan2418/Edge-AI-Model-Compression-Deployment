@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-RESULTS_DIR = Path("results")
-EXPERIMENTS_CSV = RESULTS_DIR / "experiments.csv"
-EXPERIMENTS_JSONL = RESULTS_DIR / "experiments.jsonl"
-ARTIFACTS_DIR = RESULTS_DIR / "artifacts"
+DEFAULT_RESULTS_DIR = Path("results")
 
 
-def artifact_dir(experiment_id: str) -> Path:
-    return ARTIFACTS_DIR / experiment_id
+def experiments_csv(results_dir: Path) -> Path:
+    return results_dir / "experiments.csv"
+
+
+def experiments_jsonl(results_dir: Path) -> Path:
+    return results_dir / "experiments.jsonl"
+
+
+def artifact_dir(results_dir: Path, experiment_id: str) -> Path:
+    return results_dir / "artifacts" / experiment_id

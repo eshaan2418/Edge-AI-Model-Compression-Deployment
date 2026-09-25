@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import subprocess
@@ -100,5 +101,5 @@ def benchmark_model(
     """Save ``model`` once, then run ``cfg.process_repeats`` independent processes."""
     with tempfile.TemporaryDirectory() as tmp:
         path = Path(tmp) / "model.pt"
-        torch.save(model.cpu(), path)
+        torch.save(copy.deepcopy(model).cpu(), path)
         return [run_isolated(path, input_shape, cfg) for _ in range(cfg.process_repeats)]
