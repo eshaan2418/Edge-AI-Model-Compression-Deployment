@@ -58,6 +58,7 @@ results/artifacts/
 results/sweeps/
 results/plots/
 results/surrogates/
+legacy/tflite/benchmark_results.md
 
 # Data and models (keep large/generated out of git).
 # Anchored to the repo root so the source packages edge_ai_compression/data/
