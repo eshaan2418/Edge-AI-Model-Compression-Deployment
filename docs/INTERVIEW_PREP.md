@@ -45,3 +45,29 @@ Four things:
 - A missing checkpoint path silently benchmarked random weights.
 
 All four are fixed and tested. The quantization finding also changes Phase 3's design, because torch has deprecated its quantized tensor dtypes.
+
+---
+
+## Phase 2: C++ kernels + export
+
+**1. Your int8 GEMM on x86 doesn't use `_mm256_maddubs_epi16`, the standard fast path. Why not?**
+`maddubs` multiplies unsigned by signed bytes and adds adjacent pairs into saturating int16. With symmetric int8 activations you'd have to shift them to unsigned (then correct with a row-sum term), and two products of about 128×127 already overflow int16. So it isn't exact. I sign-extend both operands to int16 and use `madd_epi16`, which sums pairs into int32 and is exact. That costs about 2× the multiply throughput of `maddubs`. VNNI (`vpdpbusd`) fixes the saturation but still needs unsigned activations. A test with K=4099 and all -128 operands would catch a saturating path.
+
+**2. Walk me through the NEON int8 microkernel.**
+`vdotq_laneq_s32(acc, b, a, lane)` adds, to each of 4 int32 lanes i, the dot product of 4 bytes of `b` (lane i) with 4 bytes of `a` selected by `lane`. I pack activations as 4 columns × 4 k-values per 16-byte vector and weights as 4 rows × 4 k-values per vector. With lane = row r, one instruction produces 4 output columns for row r. A 4×16 tile uses 16 accumulator registers, 4 B vectors and 1 A vector: 21 of 32 NEON registers, 16 dot instructions (256 multiply-adds) per 80 bytes loaded. Output rows are contiguous, so stores need no transpose.
+
+**3. Why does 50% unstructured sparsity rarely beat dense on a CPU, and why can 2:4 do better?**
+Dense GEMM reuses each loaded activation across a whole register tile: one B load feeds four FMAs, and weights are broadcast. A sparse kernel has to fetch the activation row that matches each nonzero, so it does one load per FMA vector plus index decoding, and it loses register blocking across rows. At 50% sparsity you save half the FLOPs but become load-bound, and CSR indices double the bytes per weight (a 50% CSR matrix is exactly as big as dense fp32; I measured this). 2:4 caps the metadata at 2 bits per value and makes every group the same shape, which is what the hardware sparse tensor cores exploit. On a CPU without such units the gain has to come from halved loads, so the crossover is an empirical question. My kernel study measures it per layer shape.
+
+**4. How do you know your roofline analysis isn't flattering your kernels?**
+Two choices make it conservative. Arithmetic intensity uses compulsory traffic (each operand moved once), which overstates AI, so "efficiency vs attainable" is measured against an optimistic roof. And the peaks come from single-core microbenchmarks on the same machine (independent FMA / dot chains, STREAM-style triad), logged with the same fingerprint as the kernel rows, so I never compare against spec-sheet numbers. The analysis refuses to mix machines.
+
+**5. How does a benchmark of your C++ engine stay comparable with PyTorch and ONNX Runtime?**
+Every backend goes through the same path:
+- Export one artifact, then time it in fresh processes with the same warmup/iteration protocol.
+- The same input shape, 1 thread for all (my kernels are single-threaded; ORT gets `intra_op_num_threads=1`).
+- Accuracy measured with the backend itself.
+- `size_mb` = the artifact on disk. The engine stores compressed payloads, so int8/int4 size is real.
+- Cold start includes loading and packing weights, as it would for a real runtime.
+
+Two bugs this caught before any results were produced: the dynamo ONNX exporter writing weights to a side file (so size looked like 0.1 MB), and Linux `ru_maxrss` inheriting the parent's peak across exec.

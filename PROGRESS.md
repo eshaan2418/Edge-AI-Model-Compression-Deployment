@@ -21,25 +21,18 @@ Resume point for autonomous work. Updated after every commit.
   checkpoint; compression_order column recorded stages that didn't run.
 - Configs: smoke_cpu.yml, smoke_benchmark.yml (both in CI). Docs: docs/benchmarking.md.
 
-### Phase 2 progress (branch `phase2-kernels`, pushed)
-Done:
-- `csrc/` C++ kernels + nanobind `_C` (fp32, int8 exact, int4 weight-only, 2:4, CSR, im2col,
-  quantize, microbenchmarks); runtime ISA dispatch scalar/NEON/AVX2/AVX-512. Build:
-  `pip install -e ".[kernels,export]" && scripts/build_kernels.sh`.
-- `inference/packing.py` (numpy formats + references), `inference/kernels.py` (wrappers),
-  `inference/engine.py` (FX lowering, BN fold, ReLU fusion, 5 modes, compressed payloads),
-  `inference/backends.py` (torch_eager, onnxruntime, edge_{f32,int8,w4,sparse24,csr}).
-- Benchmark worker/evaluator are backend-aware; DB schema v3 adds `backend`.
-- CI matrix ubuntu (AVX2) + macos-14 (NEON), kernels required. CI runs on every branch push.
-- Fixes found via CI: Linux ru_maxrss inherits the parent's peak across exec -> VmHWM (D1.15).
+### Phase 2 (C++ kernels + export): COMPLETE, pushed on `phase2-kernels`
+- `csrc/` kernels + nanobind `_C`; `inference/` packing, kernels, engine (FX, BN fold, ReLU fusion,
+  5 modes, compressed payloads), backends (torch_eager, onnxruntime, edge_*), kernel_bench +
+  kernel_worker, roofline; `analysis/kernel_study.py`; `run_kernel_study.py`.
+- DB schema v3 (`backend` column) + `kernel_benchmarks.csv`.
+- CI: ubuntu (AVX2) + macos-14 (NEON), kernels required; optional SDE AVX-512 job (gated).
+- Research configs ready, results PENDING (need AC power): `studies/kernel_sparsity_m5.yml`,
+  `sweeps/backend_latency_m5.yml`. Docs: docs/inference.md.
 
-Next:
-1. Confirm CI green on both OSes (last failure was the ru_maxrss issue, fix pushed in b2e8317).
-2. Roofline: `inference/roofline.py` (machine peaks via microbench, per-layer FLOPs/bytes/achieved).
-3. Kernel benchmark table in the experiment DB + fresh-process kernel worker.
-4. Sparsity study config + runner (dense vs CSR vs 2:4 across sparsity, ResNet-18 layer shapes).
-5. AVX-512 correctness in CI via Intel SDE (if downloadable), else document.
-6. Docs (docs/inference.md), INTERVIEW_PREP Phase 2, push.
+### Next: Phase 3 (PTQ/QAT ladder), branch `phase3-ptq` stacked on `phase2-kernels`
+Plan to write into DECISIONS first. Key constraint (D1.14): torch 2.14 deprecates quantized dtypes,
+so build the ladder on fake-quant simulation + our int kernels, not torch.ao quantized modules.
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
@@ -59,3 +52,11 @@ Next:
    emulation, which requires accepting Intel's SDE license. If you accept it: repo Settings ->
    Secrets and variables -> Actions -> Variables -> New variable `ENABLE_SDE` = `true`.
    Until then AVX-512 code is compiled in CI but not executed (GitHub x86 runners lack AVX-512).
+3. **Run the Phase 2 studies on the M5 Pro** (AC power, close other apps, ~idle machine):
+   ```bash
+   source .venv/bin/activate && scripts/build_kernels.sh
+   python run_kernel_study.py --config edge_ai_compression/configs/studies/kernel_sparsity_m5.yml
+   python launch_sweep.py --config edge_ai_compression/configs/sweeps/backend_latency_m5.yml
+   python -m edge_ai_compression.analysis.kernel_study --results results --study kernel_sparsity_m5
+   ```
+   Results land in `results/` (experiment DB). The strict environment check refuses to run on battery.
