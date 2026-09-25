@@ -11,7 +11,7 @@ import torch.nn as nn
 
 from edge_ai_compression.analysis.diagnostics import full_diagnostic_report
 from edge_ai_compression.benchmarking.evaluator import Evaluator, accuracy_on_loader
-from edge_ai_compression.compression.pruning.recovery import weight_sparsity
+from edge_ai_compression.compression.pruning.sparsity import weight_sparsity
 from edge_ai_compression.core.compression_orders import format_order
 from edge_ai_compression.core.experiment import ExperimentConfig, ExperimentResult
 from edge_ai_compression.core.pipeline import CompressionPipeline, enabled_stage_names
