@@ -147,3 +147,26 @@ That's why I also log the Hessian trace and weight kurtosis, and Phase 6's ablat
 
 **5. How do you scale "training length" properly, and why not just use intermediate checkpoints?**
 An intermediate checkpoint of a 90-epoch cosine run at epoch 30 has a high learning rate and hasn't annealed. It isn't the model you'd get by training for 30 epochs. So the length sweep trains separate 10, 30 and 90-epoch runs, each with its own full schedule. Intermediate checkpoints serve a different purpose: the early-prediction features, where "what does this run look like at step k" is exactly the question.
+
+---
+
+## Phase 6: studies + analysis
+
+**1. Why leave-one-configuration-out instead of ordinary cross-validation for the early-prediction study?**
+Seeds of the same configuration (model × variant × epochs) are near-duplicates. Random K-fold would put two seeds of one configuration on opposite sides of the split, and the predictor would score well by recognizing the configuration, not by reading the signals. Holding out every seed of a configuration asks the real question: given the signals of a training run on a configuration you've never seen, can you predict how compressible its final model will be? The CIs come from a cluster bootstrap over configurations for the same reason.
+
+**2. Your predictor gets Spearman 0.8. How do you know it isn't just "bigger models compress better"?**
+Two baselines are built in. A mean predictor measures skill against nothing, and a params-only ridge regression measures whether the signals add information beyond model size. The claim is only interesting if the signal-based predictor beats params-only, with non-overlapping CIs. The ablations then name which signal group carries the gain. If params-only matches the full model, that's the result, and I'd report it as a negative.
+
+**3. How would you know if an analysis pipeline, rather than the data, produced a finding?**
+Every analysis is tested on a synthetic experiment DB with a planted answer: a known signal-to-target relation, a known power-law exponent, known per-kernel costs. The test asserts the pipeline recovers the planted value and doesn't invent structure (a flat series must not beat the constant model). That caught real bugs:
+- an MLP predictor mis-specified for the installed scikit-learn version
+- an all-empty ID column parsed as float that broke a join
+
+Both were found before any real data existed. CI runs the whole `reproduce.sh` on the real-schema smoke DB.
+
+**4. When does a power-law fit say nothing?**
+With few points (I require at least 4 distinct sizes for a 3-parameter fit), heavy seed noise, or no real trend. So each fit carries a seed-bootstrap CI on the exponent and an AICc comparison against a constant model. If the power law doesn't beat the constant, the table says `beats_constant = False`. Extrapolating scaling curves beyond the measured range isn't something this data supports, and I don't do it.
+
+**5. FLOPs is the standard efficiency metric in papers. Why distrust it?**
+FLOPs counts arithmetic, not time. Kernels achieve very different FLOP/s: dense int8 on dot-product instructions, sparse CSR bound by indirect loads, 2:4 in between. Non-GEMM work (im2col, requantization, residual adds) also doesn't appear in FLOPs at all. Within one kernel family FLOPs often ranks models fine; across families it can rank a slower model as faster. The study measures exactly this (rank correlation per backend versus pooled) and fits a learned proxy that knows about each kernel's cost curve, evaluated on held-out configurations.

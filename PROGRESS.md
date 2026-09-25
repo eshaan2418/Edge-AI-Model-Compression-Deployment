@@ -54,12 +54,16 @@ Resume point for autonomous work. Updated after every commit.
 - Fixes: circular import (also patched on phase4-pruning, 6bab7ac), strict experiment keys (D5.3).
 - Docs: docs/pretraining.md. Results PENDING (NEEDS ESHAAN 8).
 
-### Next: Phase 6 (full studies + analysis), branch `phase6-studies`
-Plan into DECISIONS: (a) compression targets per checkpoint (PTQ/prune applied to every logged
-checkpoint -> post-compression accuracy), (b) early-predictability surrogates (RF/MLP/GP + GBM) vs k,
-(c) signal ablations, (d) scaling-curve fits, (e) latency-proxy study (FLOPs/params/sparsity vs
-measured latency + learned proxy), (f) Pareto frontiers; figures regenerated from the DB by
-`reproduce.sh`.
+### Phase 6 (studies + analysis): COMPLETE (code), pushed on `phase6-studies`
+- compress_runs (panel -> compressibility targets, schema v5 source_run_id/source_step);
+  analysis: early_prediction (LOCO CV, cluster-bootstrap CIs, ablations), scaling (power law + AICc),
+  latency_proxy (naive + learned kernel model), pareto_report; reproduce.sh (+ CI) with MANIFEST.
+- Fixes: FLOPs = 0 for quantized models (D6.3), MLP predictor arg, float-parsed empty id column.
+- Docs: docs/analysis.md. All results PENDING on the heavy runs (NEEDS ESHAAN 3-9).
+
+### Next: Phase 7 (paper + blog), branch `phase7-paper`
+paper/ (LaTeX, workshop length) + docs/blog.md + README headline, all with [PENDING] markers
+where results don't exist; figures only via reproduce.sh.
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
@@ -100,3 +104,6 @@ measured latency + learned proxy), (f) Pareto frontiers; figures regenerated fro
 8. **Phase 5 training tracks:** `notebooks/tracks.ipynb` cells for pretrain_variants (15 runs),
    pretrain_scaling (30), pretrain_length (9), pretrain_vit (9). These produce the checkpoints and
    signals Phase 6 analyzes.
+9. **Phase 6 targets + figures** (after 8): `python -m edge_ai_compression.experiments.compress_runs --device cuda`
+   (add `--all-steps` for compressibility-over-training), then `./reproduce.sh`. Check
+   `results/figures/MANIFEST.md`.
