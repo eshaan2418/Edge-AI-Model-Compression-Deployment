@@ -79,6 +79,10 @@ decided, alternatives considered, and why.
 - **Finding:** on torch 2.14 / macOS arm64 the quantized engine defaults to `none`, so the framework's dynamic quantization failed with `NoQEngine` on the primary platform. `utils/quant_engine.py` selects x86 > fbgemm > qnnpack.
 - **Also noted:** torch 2.14 warns that quantized tensor dtypes (`qint8`, ...) are deprecated and will be removed. This shapes Phase 3: build quantization on simulated (fake-quant) float ops plus our own integer kernels (Phase 2), not on `torch.ao` quantized modules.
 
+### D1.15 Linux peak memory comes from /proc VmHWM, not ru_maxrss
+- **Finding (CI):** in a worker spawned from pytest on Linux, `ru_maxrss` read 1.12 GB before the worker allocated anything, while VmHWM read 27 MB. At `execve` the kernel folds the old (forked-from-parent) address space's high-water mark into the process's maxrss, so `ru_maxrss` reports the parent's footprint.
+- **Decision:** Linux uses VmHWM (per address space, fresh at exec); macOS uses `ru_maxrss` (no /proc, no inheritance observed). Every Linux memory number would otherwise have been the parent process's size.
+
 ---
 
 ## Phase 2: C++ kernels + export

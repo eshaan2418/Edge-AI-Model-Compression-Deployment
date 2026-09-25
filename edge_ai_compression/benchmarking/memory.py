@@ -33,8 +33,13 @@ def memory_sources() -> dict[str, int | None]:
 def peak_rss_bytes() -> int:
     """Resident-set high-water mark of this process.
 
-    On Linux this is the max of ru_maxrss, /proc VmHWM, and current VmRSS: on
-    some CI kernels ru_maxrss did not reflect a fresh 256 MiB allocation, so no
-    single source is trusted.
+    Linux: /proc VmHWM. ``ru_maxrss`` is unusable there for spawned workers: at
+    execve the kernel folds the pre-exec address space's peak (a fork of the
+    parent) into the process's maxrss, so a worker spawned from a 1 GB pytest
+    process reports ~1 GB from its first instruction (observed in CI; DECISIONS
+    D1.15). VmHWM belongs to the new address space and starts fresh at exec.
+    macOS: ``ru_maxrss`` (bytes), which does not inherit the parent's peak.
     """
-    return max(v for v in memory_sources().values() if v is not None)
+    src = memory_sources()
+    hwm = src["vm_hwm"]
+    return hwm if hwm is not None else int(src["ru_maxrss"] or 0)

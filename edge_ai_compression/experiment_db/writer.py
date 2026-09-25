@@ -16,7 +16,11 @@ from edge_ai_compression.experiment_db.paths import (
     experiments_csv,
     experiments_jsonl,
 )
-from edge_ai_compression.experiment_db.record import EXPERIMENT_CSV_FIELDS, ExperimentRecord
+from edge_ai_compression.experiment_db.record import (
+    EXPERIMENT_CSV_FIELDS,
+    SCHEMA_VERSION,
+    ExperimentRecord,
+)
 
 
 class SchemaMismatchError(RuntimeError):
@@ -32,9 +36,8 @@ def append_csv_row(record: ExperimentRecord, results_dir: Path) -> None:
             header = next(csv.reader(f), [])
         if tuple(header) != EXPERIMENT_CSV_FIELDS:
             raise SchemaMismatchError(
-                f"{path} was written with a different schema. Move it aside (old results "
-                "used the pre-v2 benchmark harness) or point experiment_db.results_dir "
-                "somewhere else."
+                f"{path} was written with a different schema (current: v{SCHEMA_VERSION}). "
+                "Move it aside or point experiment_db.results_dir somewhere else."
             )
     write_header = not path.exists()
     with open(path, "a", newline="", encoding="utf-8") as f:
