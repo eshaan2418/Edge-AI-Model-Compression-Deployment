@@ -4,23 +4,11 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any
-
-import yaml
 
 from edge_ai_compression.pretraining.config import TrainConfig
 from edge_ai_compression.pretraining.trainer import run_training
 from edge_ai_compression.utils.config_loader import load_yaml
-
-
-def parse_overrides(items: list[str]) -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for item in items:
-        key, sep, value = item.partition("=")
-        if not sep or not key:
-            raise ValueError(f"--set expects KEY=VALUE, got {item!r}")
-        out[key.strip()] = yaml.safe_load(value)
-    return out
+from edge_ai_compression.utils.overrides import apply_overrides, parse_overrides
 
 
 def main() -> None:
@@ -34,8 +22,7 @@ def main() -> None:
         help="override a config key (value parsed as YAML), e.g. --set seed=1",
     )
     args = p.parse_args()
-    cfg = load_yaml(args.config)
-    cfg.update(parse_overrides(args.set))
+    cfg = apply_overrides(load_yaml(args.config), parse_overrides(args.set))
     result = run_training(TrainConfig.from_dict(cfg))
     print(
         f"run {result.run_id}: test accuracy {result.test_accuracy:.4f} after "

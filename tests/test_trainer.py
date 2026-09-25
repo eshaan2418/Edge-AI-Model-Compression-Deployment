@@ -53,7 +53,7 @@ def test_smoke_training_logs_run_and_checkpoints(tmp_path):
 
 
 def test_adamw_option_and_overrides():
-    from edge_ai_compression.experiments.train_model import parse_overrides
+    from edge_ai_compression.utils.overrides import apply_overrides, parse_overrides
 
     assert TrainConfig.from_dict({"optimizer": "adamw"}).optimizer == "adamw"
     with pytest.raises(ValueError, match="optimizer"):
@@ -65,3 +65,7 @@ def test_adamw_option_and_overrides():
     }
     with pytest.raises(ValueError):
         parse_overrides(["seed"])
+    nested = apply_overrides({"a": {"b": 1}}, {"a.b": 2, "a.c.d": 3, "e": 4})
+    assert nested == {"a": {"b": 2, "c": {"d": 3}}, "e": 4}
+    with pytest.raises(ValueError, match="not a mapping"):
+        apply_overrides({"a": 1}, {"a.b": 2})

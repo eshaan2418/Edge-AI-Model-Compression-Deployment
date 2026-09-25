@@ -24,6 +24,7 @@ import yaml
 from edge_ai_compression.core.experiment import ExperimentConfig
 from edge_ai_compression.core.runner import ExperimentRunner
 from edge_ai_compression.utils.config_loader import merge_dict
+from edge_ai_compression.utils.overrides import apply_overrides, parse_overrides
 
 
 def expand_variants(spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -44,8 +45,15 @@ def variant_key(variant: dict[str, Any]) -> str:
     return json.dumps(variant, sort_keys=True, default=str)
 
 
-def run_sweep(spec: dict[str, Any], state_dir: Path = Path("results") / "sweeps") -> Path:
+def run_sweep(
+    spec: dict[str, Any],
+    state_dir: Path = Path("results") / "sweeps",
+    base_overrides: dict[str, Any] | None = None,
+) -> Path:
+    """Run every variant not yet in the state file. ``base_overrides`` (dotted keys)
+    are applied to the base config before merging variants, e.g. {"device": "cuda"}."""
     base = yaml.safe_load(Path(spec["base_config"]).read_text(encoding="utf-8"))
+    base = apply_overrides(base, base_overrides or {})
     sweep_id = str(spec.get("sweep_id", "sweep"))
     variants = expand_variants(spec)
     state_path = state_dir / f"{sweep_id}_state.jsonl"
@@ -76,8 +84,16 @@ def run_sweep(spec: dict[str, Any], state_dir: Path = Path("results") / "sweeps"
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     p.add_argument("--config", type=Path, required=True, help="sweep YAML")
+    p.add_argument(
+        "--set",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="override a base-config key (dotted, YAML value), e.g. --set device=cuda",
+    )
     args = p.parse_args()
-    run_sweep(yaml.safe_load(args.config.read_text(encoding="utf-8")))
+    spec = yaml.safe_load(args.config.read_text(encoding="utf-8"))
+    run_sweep(spec, base_overrides=parse_overrides(args.set))
 
 
 if __name__ == "__main__":
