@@ -111,3 +111,7 @@ decided, alternatives considered, and why.
 
 ### D2.4 No TFLite / ExecuTorch backends
 - **Why:** no edge device to run them on, and each is a large integration. ONNX Runtime is the strong, portable baseline. The legacy TFLite scripts remain for reference.
+
+### D2.5 AVX-512 correctness via Intel SDE, gated on a repo variable
+- **Why:** GitHub's x86 runners usually lack AVX-512, so the AVX-512 kernels would never execute in CI. Intel SDE emulates a Sapphire Rapids CPU. The action is pinned by commit SHA (it vendors the SDE binaries).
+- **Gate:** using SDE means accepting Intel's license, which is the repo owner's decision, so the job runs only when `vars.ENABLE_SDE == 'true'` (see PROGRESS "NEEDS ESHAAN").

@@ -55,3 +55,7 @@ Next:
 1. **Open the Phase 0 PR.** `gh` token can't create PRs. Run `! gh auth login -h github.com -w`, then:
    `gh pr create --base main --head consolidate --title "Consolidate legacy code into legacy/"`.
    Later phase PRs stack: `phase1-benchmarking` → base `consolidate`, and so on.
+2. **(Optional) Enable AVX-512 correctness tests in CI.** They run the AVX-512 kernels under Intel SDE
+   emulation, which requires accepting Intel's SDE license. If you accept it: repo Settings ->
+   Secrets and variables -> Actions -> Variables -> New variable `ENABLE_SDE` = `true`.
+   Until then AVX-512 code is compiled in CI but not executed (GitHub x86 runners lack AVX-512).
