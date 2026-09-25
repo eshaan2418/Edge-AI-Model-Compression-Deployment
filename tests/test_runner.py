@@ -33,3 +33,10 @@ def test_removed_config_keys_raise():
         ExperimentConfig.from_dict({**base, "experiment_db": {"enabled": True}})
     with pytest.raises(ValueError, match="renamed"):
         ExperimentConfig.from_dict({**base, "benchmark": {"latency_repeats": 5}})
+
+
+def test_missing_checkpoint_is_an_error(tmp_path):
+    raw = load_experiment_config(SMOKE).to_dict()
+    raw["checkpoint_in"] = str(tmp_path / "does_not_exist.pt")
+    with pytest.raises(FileNotFoundError, match="randomly initialized"):
+        ExperimentRunner(ExperimentConfig.from_dict(raw)).run()

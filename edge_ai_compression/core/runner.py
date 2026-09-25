@@ -52,7 +52,12 @@ class ExperimentRunner:
         )
 
         model = ModelRegistry.create(cfg.model, num_classes=cfg.num_classes).to(cfg.device)
-        if cfg.checkpoint_in and os.path.isfile(cfg.checkpoint_in):
+        if cfg.checkpoint_in:
+            if not os.path.isfile(cfg.checkpoint_in):
+                raise FileNotFoundError(
+                    f"checkpoint_in {cfg.checkpoint_in!r} does not exist; refusing to "
+                    "silently evaluate randomly initialized weights"
+                )
             ckpt = torch.load(cfg.checkpoint_in, map_location=cfg.device)
             model.load_state_dict(ckpt["model_state"])
 
