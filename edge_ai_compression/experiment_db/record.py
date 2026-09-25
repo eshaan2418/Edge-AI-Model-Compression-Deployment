@@ -6,7 +6,7 @@ from typing import Any
 
 from edge_ai_compression.benchmarking.report import BenchmarkReport
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 @dataclass
@@ -31,6 +31,7 @@ class ExperimentRecord:
     compression_order: str
     pruning_type: str
     pruning_sparsity: float
+    weight_sparsity: float
     quantization_type: str
     distillation_enabled: bool
     temperature: float
@@ -87,6 +88,7 @@ def record_from_run(
     compression_order: str,
     pruning_type: str,
     pruning_sparsity: float,
+    weight_sparsity: float,
     quantization_type: str,
     distillation_enabled: bool,
     temperature: float,
@@ -113,6 +115,7 @@ def record_from_run(
         compression_order=compression_order,
         pruning_type=pruning_type,
         pruning_sparsity=pruning_sparsity,
+        weight_sparsity=weight_sparsity,
         quantization_type=quantization_type,
         distillation_enabled=distillation_enabled,
         temperature=temperature,

@@ -162,3 +162,27 @@ All methods quantize a **BN-folded** model (conv bias absorbs BN) into `QuantCon
 - `vit_t_cifar` / `vit_s_cifar` / `vit_m_cifar` (patch 4, dims 128/256/384, depths 6/6/8), explicit `qkv`/`proj`/`fc1`/`fc2` linears so every projection is quantizable. Attention matmuls (QKᵀ, AV) stay in float: SmoothQuant's W8A8 targets the linear layers.
 - The C++ engine does not lower LayerNorm/GELU/attention, so ViT quantization is evaluated in simulation (accuracy). ViT latency comes from torch_eager/onnxruntime.
 - `smoothquant.outlier_stats` (max/median of per-channel activation maxima at LayerNorm-fed linears) is logged before SmoothQuant results are interpreted. Systematic outliers are reported at LLM scale (Dettmers et al. 2022); at CIFAR-ViT scale SmoothQuant may be a no-op, which would be reported as a negative result.
+
+---
+
+## Phase 4: pruning + recovery
+
+### Plan (self-approved)
+`compression.pruning.mode`:
+- `global_unstructured` (existing): global magnitude over all conv/linear weights.
+- `layerwise_adaptive` (existing): per-layer sparsities from a scorer.
+- `nm`: N:M semi-structured (default 2:4), keeping the N largest |w| in every group of M consecutive weights along the flattened input dim [in·kh·kw], the layout the engine uses. Layers whose K isn't divisible by M are left dense and reported. Mishra et al. 2021 ("Accelerating Sparse Deep Neural Networks", NVIDIA 2:4); Zhou et al. 2021 (N:M from scratch).
+- `channel`: structured removal of the *inner* channels of each residual block (conv1 → conv2 in BasicBlock; conv1 → conv2 → conv3 in Bottleneck), which keeps residual shapes intact. Criterion is the L1 filter norm (Li et al., ICLR 2017) or |BN γ| (Liu et al., ICCV 2017, network slimming). The model is physically rebuilt smaller and dense, so every backend gets faster, not just sparse kernels.
+
+`compression.pruning.recovery`:
+- `finetune`: all weights trained, pruning masks enforced (masked SGD via `torch.nn.utils.prune` reparametrization).
+- `lora`: frozen pruned weights plus low-rank adapters ΔW = B·A per conv/linear (Hu et al. 2021; B = 0 at init). The update is masked (W + M ⊙ BA) so merging keeps the sparsity pattern; an unmasked merge would densify the layer. Related: Zhang et al. 2023 (LoRAPrune) and Li et al. 2023 (LoSparse).
+- Compared at equal steps; the parameter-efficiency trade-off is the result.
+
+Engine lowering: `nm` 2:4 → `edge_sparse24` (pattern preserved through BN folding, since row scaling keeps within-row ranking); unstructured → `edge_csr`; channel → any dense backend.
+
+### D4.1 `weight_sparsity` column (schema v4)
+- The configured `pruning_sparsity` isn't what the model ends up with. It differs for channel pruning, skipped N:M layers, and first/last-layer policies. `weight_sparsity` is the measured fraction of zero conv/linear weights in the evaluated model, needed for the sparsity-vs-latency analysis.
+
+### D4.2 Removed `compression/pruning/modes.py`
+- An unused enum listing unimplemented modes (movement, lottery ticket). Valid modes are now validated by `PruningSection`.

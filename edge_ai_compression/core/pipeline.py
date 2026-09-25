@@ -28,7 +28,10 @@ class PruningStage(CompressionStage):
         self.baseline_accuracy: float | None = None
 
     def apply(self, model: nn.Module, data: Any) -> nn.Module:
-        if self.section.mode == "layerwise_adaptive":
+        from edge_ai_compression.compression.pruning.recovery import RecoveryConfig, recover
+
+        sec = self.section
+        if sec.mode == "layerwise_adaptive":
             from edge_ai_compression.compression.pruning.layerwise.apply import (
                 apply_layerwise_l1_pruning,
                 compute_layerwise_sparsities,
@@ -36,22 +39,27 @@ class PruningStage(CompressionStage):
 
             assert data is not None, "layerwise pruning requires train DataLoader"
             sparsities = compute_layerwise_sparsities(
-                model,
-                self.section.scorer,
-                self.section.amount,
-                data,
-                self.device,
-                self.baseline_accuracy,
+                model, sec.scorer, sec.amount, data, self.device, self.baseline_accuracy
             )
-            return apply_layerwise_l1_pruning(model, sparsities)
+            model = apply_layerwise_l1_pruning(model, sparsities)
+        elif sec.mode == "nm":
+            from edge_ai_compression.compression.pruning.nm import apply_nm_pruning
 
-        from edge_ai_compression.compression.pruning.global_unstructured import (
-            apply_global_unstructured_pruning,
-            remove_pruning_reparametrization,
-        )
+            apply_nm_pruning(model, sec.n, sec.m)
+        elif sec.mode == "channel":
+            from edge_ai_compression.compression.pruning.channel import prune_block_channels
 
-        model = apply_global_unstructured_pruning(model, amount=self.section.amount)
-        return remove_pruning_reparametrization(model)
+            prune_block_channels(model, sec.amount, sec.criterion)
+        else:
+            from edge_ai_compression.compression.pruning.global_unstructured import (
+                apply_global_unstructured_pruning,
+                remove_pruning_reparametrization,
+            )
+
+            model = apply_global_unstructured_pruning(model, amount=sec.amount)
+            model = remove_pruning_reparametrization(model)
+        recover(model, data, RecoveryConfig.from_dict(sec.recovery), self.device)
+        return model
 
 
 class QuantizationStage(CompressionStage):

@@ -11,6 +11,7 @@ import torch.nn as nn
 
 from edge_ai_compression.analysis.diagnostics import full_diagnostic_report
 from edge_ai_compression.benchmarking.evaluator import Evaluator, accuracy_on_loader
+from edge_ai_compression.compression.pruning.recovery import weight_sparsity
 from edge_ai_compression.core.compression_orders import format_order
 from edge_ai_compression.core.experiment import ExperimentConfig, ExperimentResult
 from edge_ai_compression.core.pipeline import CompressionPipeline, enabled_stage_names
@@ -118,14 +119,9 @@ class ExperimentRunner:
         nparams = count_parameters(work)
         flops = estimate_flops_macs(work, report.input_shape)
 
-        pruning_type = (
-            f"{cfg.compression.pruning.mode}:{cfg.compression.pruning.scorer}"
-            if cfg.compression.pruning.enabled
-            else "none"
-        )
-        pruning_sparsity = (
-            float(cfg.compression.pruning.amount) if cfg.compression.pruning.enabled else 0.0
-        )
+        prune_sec = cfg.compression.pruning
+        pruning_type = prune_sec.tag if prune_sec.enabled else "none"
+        pruning_sparsity = prune_sec.target_sparsity if prune_sec.enabled else 0.0
 
         record = record_from_run(
             experiment_id=exp_id,
@@ -136,6 +132,7 @@ class ExperimentRunner:
             compression_order=applied_order,
             pruning_type=pruning_type,
             pruning_sparsity=pruning_sparsity,
+            weight_sparsity=weight_sparsity(work),
             quantization_type=cfg.compression.quantization.tag
             if cfg.compression.quantization.enabled
             else "none",

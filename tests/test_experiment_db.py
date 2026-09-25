@@ -62,6 +62,7 @@ def _record(report: BenchmarkReport):
         compression_order="prune",
         pruning_type="global",
         pruning_sparsity=0.3,
+        weight_sparsity=0.29,
         quantization_type="none",
         distillation_enabled=False,
         temperature=4.0,

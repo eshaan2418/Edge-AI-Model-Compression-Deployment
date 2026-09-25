@@ -16,12 +16,71 @@ def _section(d: dict[str, Any], key: str, default: dict[str, Any] | None = None)
     return dict(default or {})
 
 
+PRUNE_MODES = ("global_unstructured", "layerwise_adaptive", "nm", "channel")
+PRUNE_KEYS = {"enabled", "amount", "mode", "scorer", "n", "m", "criterion", "recovery"}
+
+
 @dataclass
 class PruningSection:
+    """Pruning settings (DECISIONS Phase 4). ``amount`` is the weight fraction for
+    unstructured modes and the inner-channel fraction for ``channel``; ``nm`` uses
+    ``n``:``m``. ``recovery`` is a RecoveryConfig dict (method none|finetune|lora)."""
+
     enabled: bool = False
     amount: float = 0.5
     mode: str = "global_unstructured"
     scorer: str = "magnitude"
+    n: int = 2
+    m: int = 4
+    criterion: str = "l1"
+    recovery: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        from edge_ai_compression.compression.pruning.channel import CRITERIA
+        from edge_ai_compression.compression.pruning.recovery import RecoveryConfig
+
+        if self.mode not in PRUNE_MODES:
+            raise ValueError(f"unknown pruning mode '{self.mode}'; expected {PRUNE_MODES}")
+        if self.criterion not in CRITERIA:
+            raise ValueError(f"unknown channel criterion '{self.criterion}'; expected {CRITERIA}")
+        if not 0 < self.n < self.m:
+            raise ValueError("pruning needs 0 < n < m")
+        RecoveryConfig.from_dict(self.recovery)
+
+    @property
+    def recovery_method(self) -> str:
+        return str(self.recovery.get("method", "none"))
+
+    @property
+    def target_sparsity(self) -> float:
+        return 1.0 - self.n / self.m if self.mode == "nm" else float(self.amount)
+
+    @property
+    def tag(self) -> str:
+        if self.mode == "nm":
+            base = f"nm:{self.n}:{self.m}"
+        elif self.mode == "channel":
+            base = f"channel:{self.criterion}:{self.amount}"
+        else:
+            base = f"{self.mode}:{self.scorer}:{self.amount}"
+        rec = self.recovery_method
+        return base if rec == "none" else f"{base}+{rec}"
+
+    @staticmethod
+    def from_dict(p: dict[str, Any]) -> PruningSection:
+        unknown = set(p) - PRUNE_KEYS
+        if unknown:
+            raise ValueError(f"unknown pruning keys: {sorted(unknown)}")
+        return PruningSection(
+            enabled=bool(p.get("enabled", False)),
+            amount=float(p.get("amount", 0.5)),
+            mode=str(p.get("mode", "global_unstructured")),
+            scorer=str(p.get("scorer", "magnitude")),
+            n=int(p.get("n", 2)),
+            m=int(p.get("m", 4)),
+            criterion=str(p.get("criterion", "l1")),
+            recovery=dict(p.get("recovery") or {}),
+        )
 
 
 QUANT_METHODS = ("rtn", "adaround", "brecq", "qat", "hawq", "smoothquant")
@@ -140,12 +199,7 @@ class CompressionConfig:
         q = _section(d, "quantization")
         di = _section(d, "distillation")
         return CompressionConfig(
-            pruning=PruningSection(
-                enabled=bool(p.get("enabled", False)),
-                amount=float(p.get("amount", 0.5)),
-                mode=str(p.get("mode", "global_unstructured")),
-                scorer=str(p.get("scorer", "magnitude")),
-            ),
+            pruning=PruningSection.from_dict(p),
             quantization=QuantizationSection.from_dict(q),
             distillation=DistillationSection(
                 enabled=bool(di.get("enabled", False)),
