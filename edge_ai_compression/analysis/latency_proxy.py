@@ -28,6 +28,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.linear_model import LinearRegression, Ridge
 
+from edge_ai_compression.analysis.errors import InsufficientData
 from edge_ai_compression.experiment_db.paths import artifact_dir
 
 BACKEND_OP = {
@@ -146,7 +147,7 @@ def proxy_comparison(
         + df["backend"]
     ).to_numpy()
     if len(np.unique(groups)) < 3:
-        raise ValueError("need >= 3 run configurations for leave-one-configuration-out")
+        raise InsufficientData("need >= 3 run configurations for leave-one-configuration-out")
     y = df["latency_median"].to_numpy(float)
     rows = []
     for name, col in (("learned", "learned_sum_ms"), ("flops", "flops"), ("params", "num_params")):

@@ -34,10 +34,13 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from edge_ai_compression.analysis.errors import InsufficientData
 from edge_ai_compression.experiments.compress_runs import method_tag
 from edge_ai_compression.pretraining.signals import SCALAR_FIELDS
 
 FRACTIONS = (0.0, 0.01, 0.03, 0.1, 0.3, 1.0)
+
+
 FEATURE_GROUPS: dict[str, tuple[str, ...]] = {
     "weights": (
         "kurtosis_mean",
@@ -66,7 +69,8 @@ PREDICTORS: dict[str, Callable[[], RegressorMixin]] = {
         n_estimators=200, max_depth=2, learning_rate=0.05, subsample=0.8, random_state=0
     ),
     "mlp": lambda: make_pipeline(
-        StandardScaler(), MLPRegressor((32, 16), alpha=1e-2, max_iter=3000, random_state=0)
+        StandardScaler(),
+        MLPRegressor(hidden_layer_sizes=(32, 16), alpha=1e-2, max_iter=3000, random_state=0),
     ),
     "gp": lambda: make_pipeline(
         StandardScaler(),
@@ -190,8 +194,10 @@ def prediction_vs_fraction(
     rows = []
     for f in fractions:
         df = build_dataset(runs, signals, exps, method, f)
+        if df.empty:
+            raise InsufficientData(f"no training runs with signals and a final '{method}' result")
         if df["config"].nunique() < 3:
-            raise ValueError(
+            raise InsufficientData(
                 f"need >= 3 configurations for grouped CV, have {df['config'].nunique()}"
             )
         cols = feature_columns(df)
