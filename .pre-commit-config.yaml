@@ -3,5 +3,5 @@ repos:
     rev: v0.8.4
     hooks:
       - id: ruff
-        args: [--fix, edge_ai_compression, tests]
+        args: [--fix]
       - id: ruff-format
