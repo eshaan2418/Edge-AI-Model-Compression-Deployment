@@ -21,9 +21,25 @@ Resume point for autonomous work. Updated after every commit.
   checkpoint; compression_order column recorded stages that didn't run.
 - Configs: smoke_cpu.yml, smoke_benchmark.yml (both in CI). Docs: docs/benchmarking.md.
 
-### Next (Phase 2)
-Write the Phase 2 plan into DECISIONS (no approval gate), then implement: C++ kernel library
-(NEON primary; AVX2/AVX-512 correctness in CI), nanobind/pybind11 bindings, CMake in CI, export path.
+### Phase 2 progress (branch `phase2-kernels`, pushed)
+Done:
+- `csrc/` C++ kernels + nanobind `_C` (fp32, int8 exact, int4 weight-only, 2:4, CSR, im2col,
+  quantize, microbenchmarks); runtime ISA dispatch scalar/NEON/AVX2/AVX-512. Build:
+  `pip install -e ".[kernels,export]" && scripts/build_kernels.sh`.
+- `inference/packing.py` (numpy formats + references), `inference/kernels.py` (wrappers),
+  `inference/engine.py` (FX lowering, BN fold, ReLU fusion, 5 modes, compressed payloads),
+  `inference/backends.py` (torch_eager, onnxruntime, edge_{f32,int8,w4,sparse24,csr}).
+- Benchmark worker/evaluator are backend-aware; DB schema v3 adds `backend`.
+- CI matrix ubuntu (AVX2) + macos-14 (NEON), kernels required. CI runs on every branch push.
+- Fixes found via CI: Linux ru_maxrss inherits the parent's peak across exec -> VmHWM (D1.15).
+
+Next:
+1. Confirm CI green on both OSes (last failure was the ru_maxrss issue, fix pushed in b2e8317).
+2. Roofline: `inference/roofline.py` (machine peaks via microbench, per-layer FLOPs/bytes/achieved).
+3. Kernel benchmark table in the experiment DB + fresh-process kernel worker.
+4. Sparsity study config + runner (dense vs CSR vs 2:4 across sparsity, ResNet-18 layer shapes).
+5. AVX-512 correctness in CI via Intel SDE (if downloadable), else document.
+6. Docs (docs/inference.md), INTERVIEW_PREP Phase 2, push.
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
@@ -33,6 +49,7 @@ Write the Phase 2 plan into DECISIONS (no approval gate), then implement: C++ ke
 - torch 2.14 deprecates quantized tensor dtypes (qint8 etc.). Phase 3 should use fake-quant simulation
   plus our own int kernels rather than torch.ao quantized modules (DECISIONS D1.14).
 - Percentile-bootstrap CIs with 5 processes under-cover; use >=10 for headline claims.
+- Kernels are single-threaded (D2.2): compare against torch/ORT at 1 thread.
 
 ## NEEDS ESHAAN
 1. **Open the Phase 0 PR.** `gh` token can't create PRs. Run `! gh auth login -h github.com -w`, then:
