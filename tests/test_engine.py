@@ -132,3 +132,9 @@ def test_maxpool_and_standalone_relu():
     ).eval()
     x = torch.randn(1, 3, 8, 8)
     np.testing.assert_allclose(compile_model(m, "f32")(x.numpy()), _ref(m, x), rtol=1e-4, atol=1e-5)
+
+
+def test_artifact_size_reflects_compressed_storage(model):
+    sizes = {m: len(pickle.dumps(compile_model(model, m))) for m in ("f32", "int8", "w4")}
+    assert 3.5 < sizes["f32"] / sizes["int8"] < 4.1
+    assert sizes["f32"] / sizes["w4"] > 6

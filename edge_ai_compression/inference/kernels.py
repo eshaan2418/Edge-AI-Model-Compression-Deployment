@@ -13,8 +13,6 @@ from typing import Any
 
 import numpy as np
 
-from edge_ai_compression.inference import packing
-
 BUILD_HINT = 'pip install -e ".[kernels]" && scripts/build_kernels.sh'
 
 
@@ -121,9 +119,11 @@ def absmax(x: np.ndarray) -> float:
 # ------------------------------------------------------ int4 weight-only ----
 
 
-def make_w4(w: np.ndarray, group: int) -> Any:
-    q, scales = packing.quantize_w4(w, group)
-    return require().make_w4(q, scales, int(w.shape[1]), group)
+def make_w4(q: np.ndarray, scales: np.ndarray, k: int, group: int) -> Any:
+    """Build from ``packing.quantize_w4`` output."""
+    return require().make_w4(
+        np.ascontiguousarray(q, dtype=np.uint8), _f32(scales), int(k), int(group)
+    )
 
 
 def gemm_w4(
@@ -151,9 +151,14 @@ def gemm_sparse24(
     return out
 
 
-def make_csr(w: np.ndarray) -> Any:
-    values, col, row_ptr = packing.to_csr(w)
-    return require().make_csr(values, col, row_ptr, int(w.shape[1]))
+def make_csr(values: np.ndarray, col: np.ndarray, row_ptr: np.ndarray, k: int) -> Any:
+    """Build from ``packing.to_csr`` output."""
+    return require().make_csr(
+        _f32(values),
+        np.ascontiguousarray(col, dtype=np.int32),
+        np.ascontiguousarray(row_ptr, dtype=np.int32),
+        int(k),
+    )
 
 
 def gemm_csr(

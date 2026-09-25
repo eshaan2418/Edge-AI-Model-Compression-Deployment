@@ -79,7 +79,7 @@ def test_gemm_w4(isa, m, n, k, group):
     w, b, bias = _rand_f32(m, k), _rand_f32(k, n), _rand_f32(m)
     q, scales = packing.quantize_w4(w, group)
     ref = packing.dequantize_w4(q, scales, k, group) @ b + bias[:, None]
-    out = kernels.gemm_w4(kernels.make_w4(w, group), b, bias, False, isa)
+    out = kernels.gemm_w4(kernels.make_w4(q, scales, k, group), b, bias, False, isa)
     np.testing.assert_allclose(out, ref, rtol=1e-4, atol=1e-4)
 
 
@@ -101,7 +101,7 @@ def test_gemm_sparse24(isa, m, n, k, relu):
 def test_gemm_csr(isa, sparsity):
     w = packing.magnitude_prune(_rand_f32(13, 70), sparsity)
     b = _rand_f32(70, 37)
-    out = kernels.gemm_csr(kernels.make_csr(w), b, None, False, isa)
+    out = kernels.gemm_csr(kernels.make_csr(*packing.to_csr(w), 70), b, None, False, isa)
     np.testing.assert_allclose(out, w @ b, rtol=1e-4, atol=1e-4)
 
 

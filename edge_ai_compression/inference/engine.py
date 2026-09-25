@@ -52,67 +52,87 @@ class OpRecord:
         return 2 * self.m * self.n * self.k
 
 
+def _payload(mode: str, w: np.ndarray) -> tuple[str, dict[str, np.ndarray]]:
+    """Compress a folded fp32 weight [M, K] into the stored form for ``mode``.
+
+    Returns the effective mode (2:4 falls back to f32 when K % 4 != 0) and the
+    arrays that are serialized, so artifact size reflects real storage.
+    """
+    if mode == "sparse24" and w.shape[1] % 4:
+        mode = "f32"
+    if mode == "f32":
+        return mode, {"w": np.ascontiguousarray(w, dtype=np.float32)}
+    if mode == "int8":
+        q, scale = packing.quantize_rows_s8(w)
+        return mode, {"q": q, "scale": scale}
+    if mode == "w4":
+        q, scales = packing.quantize_w4(w, W4_GROUP)
+        return mode, {"q": q, "scales": scales}
+    if mode == "sparse24":
+        values, meta = packing.prune_24(w)
+        return mode, {"values": values, "meta": meta}
+    if mode == "csr":
+        values, col, row_ptr = packing.to_csr(w)
+        return mode, {"values": values, "col": col, "row_ptr": row_ptr}
+    raise ValueError(f"unknown mode {mode}")
+
+
 @dataclass
 class _Gemm:
-    """A conv (lowered to im2col + GEMM) or linear layer with a quantized/sparse weight."""
+    """A conv (lowered to im2col + GEMM) or linear layer with a compressed weight."""
 
     name: str
-    mode: str
-    weight: np.ndarray  # [M, K] fp32 after BN folding
-    bias: np.ndarray  # [M]
+    mode: str  # effective mode
+    m: int
+    k: int
+    payload: dict[str, np.ndarray] = field(repr=False)
+    bias: np.ndarray = field(repr=False)
     relu: bool
     conv: tuple[int, int, int, int] | None  # (kh, kw, stride, pad) or None for linear
     isa: str
     packed: Any = field(default=None, repr=False)
-    row_scale: np.ndarray | None = field(default=None, repr=False)
 
     def __getstate__(self) -> dict[str, Any]:
-        return {**self.__dict__, "packed": None, "row_scale": None}
+        return {**self.__dict__, "packed": None}
 
     @property
-    def effective_mode(self) -> str:
-        if self.mode == "sparse24" and self.weight.shape[1] % 4:
-            return "f32"
-        return self.mode
+    def weight_nbytes(self) -> int:
+        return sum(a.nbytes for a in self.payload.values())
 
     def prepare(self) -> None:
         if self.packed is not None:
             return
-        w, mode = self.weight, self.effective_mode
-        if mode == "f32":
-            self.packed = kernels.pack_f32(w)
-        elif mode == "int8":
-            q, self.row_scale = packing.quantize_rows_s8(w)
-            self.packed = kernels.pack_s8(q, self.isa)
-        elif mode == "w4":
-            self.packed = kernels.make_w4(w, W4_GROUP)
-        elif mode == "sparse24":
-            self.packed = kernels.make_sparse24(*packing.prune_24(w))
-        elif mode == "csr":
-            self.packed = kernels.make_csr(w)
-        else:
-            raise ValueError(f"unknown mode {mode}")
+        p = self.payload
+        if self.mode == "f32":
+            self.packed = kernels.pack_f32(p["w"])
+        elif self.mode == "int8":
+            self.packed = kernels.pack_s8(p["q"], self.isa)
+        elif self.mode == "w4":
+            self.packed = kernels.make_w4(p["q"], p["scales"], self.k, W4_GROUP)
+        elif self.mode == "sparse24":
+            self.packed = kernels.make_sparse24(p["values"], p["meta"])
+        elif self.mode == "csr":
+            self.packed = kernels.make_csr(p["values"], p["col"], p["row_ptr"], self.k)
 
     def matmul(self, b: np.ndarray) -> np.ndarray:
         """[K, N] activations -> [M, N] outputs (bias and ReLU applied)."""
-        mode, isa = self.effective_mode, self.isa
-        if mode == "int8":
+        if self.mode == "int8":
             scale = kernels.absmax(b) / packing.QMAX or 1.0
             acc = kernels.gemm_s8(self.packed, kernels.quantize_s8(b, scale))
-            return kernels.requantize(acc, self.row_scale, scale, self.bias, self.relu)
+            return kernels.requantize(acc, self.payload["scale"], scale, self.bias, self.relu)
         fn = {
             "f32": kernels.gemm_f32,
             "w4": kernels.gemm_w4,
             "sparse24": kernels.gemm_sparse24,
             "csr": kernels.gemm_csr,
-        }[mode]
-        return fn(self.packed, b, self.bias, self.relu, isa)
+        }[self.mode]
+        return fn(self.packed, b, self.bias, self.relu, self.isa)
 
     def run(self, x: np.ndarray, rec: OpRecord | None) -> np.ndarray:
         if self.conv is None:  # linear: x is [K] -> [M]
             out = self.matmul(x.reshape(-1, 1))[:, 0]
             if rec:
-                rec.m, rec.n, rec.k = self.weight.shape[0], 1, self.weight.shape[1]
+                rec.m, rec.n, rec.k = self.m, 1, self.k
             return out
         kh, kw, stride, pad = self.conv
         _, h, w = x.shape
@@ -120,16 +140,16 @@ class _Gemm:
             kernels.conv_out_size(h, kh, stride, pad),
             kernels.conv_out_size(w, kw, stride, pad),
         )
-        if self.effective_mode == "int8":
+        if self.mode == "int8":
             # Quantize once before im2col (8x less data to rearrange than fp32).
             scale = kernels.absmax(x) / packing.QMAX or 1.0
             cols = kernels.im2col(kernels.quantize_s8(x, scale), kh, kw, stride, pad)
             acc = kernels.gemm_s8(self.packed, cols)
-            out = kernels.requantize(acc, self.row_scale, scale, self.bias, self.relu)
+            out = kernels.requantize(acc, self.payload["scale"], scale, self.bias, self.relu)
         else:
             out = self.matmul(kernels.im2col(x, kh, kw, stride, pad))
         if rec:
-            rec.m, rec.n, rec.k = self.weight.shape[0], ho * wo, self.weight.shape[1]
+            rec.m, rec.n, rec.k = self.m, ho * wo, self.k
         return out.reshape(-1, ho, wo)
 
 
@@ -273,7 +293,9 @@ def compile_model(model: nn.Module, mode: str = "f32", isa: str = "auto") -> Eng
             w, b = _fold_bn(mod, bn)  # type: ignore[arg-type]
             relu = fuse_relu(last)
             kh, kw = mod.kernel_size
-            gemm = _Gemm(n.name, mode, w, b, relu, (kh, kw, mod.stride[0], mod.padding[0]), isa)
+            eff, payload = _payload(mode, w)
+            geom = (kh, kw, mod.stride[0], mod.padding[0])
+            gemm = _Gemm(n.name, eff, w.shape[0], w.shape[1], payload, b, relu, geom, isa)
             nodes.append(_Node(n.name, "gemm", [src(n.args[0])], gemm=gemm))
         elif isinstance(mod, nn.Linear):
             w = mod.weight.detach().float().numpy()
@@ -283,7 +305,8 @@ def compile_model(model: nn.Module, mode: str = "f32", isa: str = "auto") -> Eng
                 else np.zeros(w.shape[0], np.float32)
             )
             relu = fuse_relu(n)
-            gemm = _Gemm(n.name, mode, np.ascontiguousarray(w), b, relu, None, isa)
+            eff, payload = _payload(mode, w)
+            gemm = _Gemm(n.name, eff, w.shape[0], w.shape[1], payload, b, relu, None, isa)
             nodes.append(_Node(n.name, "gemm", [src(n.args[0])], gemm=gemm))
         elif isinstance(mod, nn.BatchNorm2d):
             raise NotImplementedError(f"{n.name}: BatchNorm not directly after a conv")
