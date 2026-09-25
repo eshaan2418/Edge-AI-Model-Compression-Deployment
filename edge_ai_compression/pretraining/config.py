@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from typing import Any
 
-VARIANTS = ("standard",)
 SCHEDULES = ("cosine", "constant")
 OPTIMIZERS = ("sgd", "adamw")
 
@@ -28,7 +27,8 @@ class TrainConfig:
     limit_samples: int | None = None
     device: str = "cpu"
     seed: int = 0
-    variant: str = "standard"
+    variant: str = "standard"  # standard | quant_noise | kurtosis | rigl
+    variant_options: dict[str, Any] = field(default_factory=dict)
     epochs: int = 1
     max_steps: int | None = None
     optimizer: str = "sgd"
@@ -48,8 +48,9 @@ class TrainConfig:
     signal_every_steps: int | None = None  # in addition to every checkpoint step
 
     def __post_init__(self) -> None:
-        if self.variant not in VARIANTS:
-            raise ValueError(f"unknown variant '{self.variant}'; expected {VARIANTS}")
+        from edge_ai_compression.pretraining.variants import make_variant
+
+        make_variant(self.variant, self.variant_options)  # validates name and options
         if self.optimizer not in OPTIMIZERS:
             raise ValueError(f"unknown optimizer '{self.optimizer}'; expected {OPTIMIZERS}")
         if self.schedule not in SCHEDULES:
@@ -78,6 +79,8 @@ class TrainConfig:
                 kwargs[key] = None if value is None else str(value)
             elif key == "signals":
                 kwargs[key] = None if value is None else dict(value)
+            elif key == "variant_options":
+                kwargs[key] = dict(value or {})
             elif value is None or default is None:
                 kwargs[key] = value if value is None else int(value)
             elif isinstance(default, bool):

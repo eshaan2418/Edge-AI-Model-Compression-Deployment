@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, fields
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,7 +11,7 @@ from typing import Any
 from edge_ai_compression.benchmarking.fingerprint import Fingerprint
 from edge_ai_compression.pretraining.config import TrainConfig
 
-TRAINING_SCHEMA_VERSION = 1
+TRAINING_SCHEMA_VERSION = 2
 
 
 @dataclass
@@ -24,6 +25,7 @@ class TrainingRecord:
     model: str
     dataset: str
     variant: str
+    variant_options: str
     seed: int
     epochs: int
     steps: int
@@ -57,6 +59,7 @@ class TrainingRecord:
             model=cfg.model,
             dataset=cfg.dataset,
             variant=cfg.variant,
+            variant_options=json.dumps(cfg.variant_options, sort_keys=True),
             seed=cfg.seed,
             epochs=cfg.epochs,
             steps=steps,

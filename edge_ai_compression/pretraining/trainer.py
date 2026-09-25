@@ -29,6 +29,7 @@ from edge_ai_compression.experiment_db.training_record import (
 )
 from edge_ai_compression.pretraining.config import TrainConfig
 from edge_ai_compression.pretraining.signals import SignalConfig, compute_signals
+from edge_ai_compression.pretraining.variants import make_variant
 from edge_ai_compression.utils.reproducibility import set_seed
 
 
@@ -79,6 +80,8 @@ def train_model(
     if cfg.max_steps is not None:
         total = min(total, cfg.max_steps)
     ckpt_steps = set(log_spaced_steps(total, cfg.num_checkpoints))
+    variant = make_variant(cfg.variant, cfg.variant_options)
+    variant.setup(model, total)  # before the optimizer: parametrizations re-register weights
     decay, no_decay = [], []
     for name, p in model.named_parameters():
         exempt = p.ndim <= 1 or name.endswith((".bias", "_scale"))  # BN, biases, quant scales
@@ -107,10 +110,12 @@ def train_model(
             for g in opt.param_groups:
                 g["lr"] = lr_at(step, total, cfg, steps_per_epoch)
             images, targets = images.to(device), targets.to(device)
-            loss = criterion(model(images), targets)
+            loss = criterion(model(images), targets) + variant.extra_loss(model)
             opt.zero_grad(set_to_none=True)
             loss.backward()
+            variant.after_backward(model, step + 1)
             opt.step()
+            variant.after_step(model, opt, step + 1)
             step += 1
             running += loss.item()
             if step % cfg.log_every_steps == 0 or step == total:
@@ -133,7 +138,17 @@ def train_model(
                 on_step(step, epoch)
             if step in ckpt_steps and on_checkpoint is not None:
                 on_checkpoint(step, epoch)
+    variant.finalize(model)
     return step, history
+
+
+def clean_state_dict(model: nn.Module) -> dict[str, torch.Tensor]:
+    """state_dict with parametrized weights under their plain names (loadable into
+    the unmodified architecture)."""
+    out = {}
+    for key, value in model.state_dict().items():
+        out[key.replace("parametrizations.weight.original", "weight")] = value.detach().clone()
+    return out
 
 
 def _probe_batch(loader: DataLoader, n: int, device: str) -> tuple[torch.Tensor, torch.Tensor]:
@@ -169,7 +184,7 @@ def run_training(cfg: TrainConfig) -> TrainResult:
         path = ckpt_dir / f"step_{step:07d}.pt"
         torch.save(
             {
-                "model_state": model.state_dict(),
+                "model_state": clean_state_dict(model),
                 "step": step,
                 "epoch": epoch,
                 "run_id": run_id,
