@@ -22,8 +22,13 @@ from edge_ai_compression.benchmarking.fingerprint import collect
 from edge_ai_compression.core.experiment import dataset_num_classes
 from edge_ai_compression.core.registry import ModelRegistry
 from edge_ai_compression.data.loaders import build_loaders
-from edge_ai_compression.experiment_db.training_record import TrainingRecord, append_training_row
+from edge_ai_compression.experiment_db.training_record import (
+    TrainingRecord,
+    append_signal_rows,
+    append_training_row,
+)
 from edge_ai_compression.pretraining.config import TrainConfig
+from edge_ai_compression.pretraining.signals import SignalConfig, compute_signals
 from edge_ai_compression.utils.reproducibility import set_seed
 
 
@@ -60,10 +65,12 @@ def train_model(
     cfg: TrainConfig,
     *,
     on_checkpoint: Any = None,
+    on_step: Any = None,
 ) -> tuple[int, list[dict[str, float]]]:
     """Train ``model`` in place. Returns (steps run, history rows).
 
-    ``on_checkpoint(step, epoch)`` is called at every log-spaced checkpoint step.
+    ``on_checkpoint(step, epoch)`` is called at every log-spaced checkpoint step,
+    ``on_step(step, epoch)`` after every optimizer step.
     """
     device = torch.device(cfg.device)
     model.to(device)
@@ -122,9 +129,22 @@ def train_model(
                     }
                 )
                 running = 0.0
+            if on_step is not None:
+                on_step(step, epoch)
             if step in ckpt_steps and on_checkpoint is not None:
                 on_checkpoint(step, epoch)
     return step, history
+
+
+def _probe_batch(loader: DataLoader, n: int, device: str) -> tuple[torch.Tensor, torch.Tensor]:
+    """A fixed batch of training data (drawn once) for signal measurement."""
+    xs, ys = [], []
+    for images, labels in loader:
+        xs.append(images)
+        ys.append(labels)
+        if sum(len(x) for x in xs) >= n:
+            break
+    return torch.cat(xs)[:n].to(device), torch.cat(ys)[:n].to(device)
 
 
 def run_training(cfg: TrainConfig) -> TrainResult:
@@ -159,8 +179,35 @@ def run_training(cfg: TrainConfig) -> TrainResult:
         )
         checkpoints.append(str(path))
 
+    signal_rows: list[dict[str, Any]] = []
+    on_step = None
+    if cfg.signals is not None:
+        sig_cfg = SignalConfig.from_dict(cfg.signals)
+        probe_x, probe_y = _probe_batch(train_loader, sig_cfg.probe_samples, cfg.device)
+        total = len(train_loader) * cfg.epochs
+        total = min(total, cfg.max_steps) if cfg.max_steps else total
+        wanted = set(log_spaced_steps(total, cfg.num_checkpoints))
+        if cfg.signal_every_steps:
+            wanted |= set(range(cfg.signal_every_steps, total + 1, cfg.signal_every_steps))
+        wanted.add(0)
+        signals_file = run_dir / "signals.jsonl"
+
+        def on_step(step: int, epoch: int) -> None:
+            if step not in wanted:
+                return
+            scalars, per_layer = compute_signals(model, probe_x, probe_y, sig_cfg)
+            signal_rows.append({"run_id": run_id, "step": step, "epoch": epoch, **scalars})
+            with open(signals_file, "a", encoding="utf-8") as f:
+                f.write(
+                    json.dumps({"step": step, "epoch": epoch, **scalars, "layers": per_layer})
+                    + "\n"
+                )
+
+        model.to(cfg.device)
+        on_step(0, 0)  # initialization
+
     t0 = time.perf_counter()
-    steps, history = train_model(model, train_loader, cfg, on_checkpoint=save)
+    steps, history = train_model(model, train_loader, cfg, on_checkpoint=save, on_step=on_step)
     train_seconds = time.perf_counter() - t0
     acc, loss = accuracy_on_loader(model, test_loader, cfg.device)
     if cfg.export_path:
@@ -174,6 +221,7 @@ def run_training(cfg: TrainConfig) -> TrainResult:
             f.write(json.dumps(row) + "\n")
     with open(run_dir / "fingerprint.json", "w", encoding="utf-8") as f:
         json.dump(fingerprint.to_dict(), f, indent=2, default=str)
+    append_signal_rows(signal_rows, Path(cfg.results_dir))
     append_training_row(
         TrainingRecord.create(
             run_id=run_id,

@@ -44,6 +44,8 @@ class TrainConfig:
     export_path: str | None = None  # also copy the final checkpoint here (stable path for configs)
     results_dir: str = "results"
     log_every_steps: int = 50
+    signals: dict[str, Any] | None = None  # SignalConfig options; None disables signal logging
+    signal_every_steps: int | None = None  # in addition to every checkpoint step
 
     def __post_init__(self) -> None:
         if self.variant not in VARIANTS:
@@ -57,6 +59,10 @@ class TrainConfig:
                 raise ValueError(f"train.{name} must be >= 1")
         if self.max_steps is not None and self.max_steps < 1:
             raise ValueError("train.max_steps must be >= 1")
+        if self.signals is not None:
+            from edge_ai_compression.pretraining.signals import SignalConfig
+
+            SignalConfig.from_dict(self.signals)
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> TrainConfig:
@@ -70,6 +76,8 @@ class TrainConfig:
             default = getattr(defaults, key)
             if key == "export_path":
                 kwargs[key] = None if value is None else str(value)
+            elif key == "signals":
+                kwargs[key] = None if value is None else dict(value)
             elif value is None or default is None:
                 kwargs[key] = value if value is None else int(value)
             elif isinstance(default, bool):

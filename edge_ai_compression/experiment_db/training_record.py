@@ -80,3 +80,21 @@ def append_training_row(record: TrainingRecord, results_dir: Path) -> None:
     from edge_ai_compression.experiment_db.writer import append_row
 
     append_row(results_dir / "training_runs.csv", TRAINING_CSV_FIELDS, record.to_csv_row())
+
+
+SIGNAL_CSV_FIELDS: tuple[str, ...] = ("run_id", "step", "epoch")
+
+
+def signal_fields() -> tuple[str, ...]:
+    from edge_ai_compression.pretraining.signals import SCALAR_FIELDS
+
+    return SIGNAL_CSV_FIELDS + SCALAR_FIELDS
+
+
+def append_signal_rows(rows: list[dict[str, Any]], results_dir: Path) -> None:
+    """Append rows of ``training_signals.csv`` (one per logged step)."""
+    from edge_ai_compression.experiment_db.writer import append_row
+
+    fields = signal_fields()
+    for row in rows:
+        append_row(results_dir / "training_signals.csv", fields, {k: row[k] for k in fields})

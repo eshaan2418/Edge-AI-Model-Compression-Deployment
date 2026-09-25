@@ -15,8 +15,8 @@ from edge_ai_compression.compression.pruning.recovery import (
     RecoveryConfig,
     finetune_masked,
     lora_recover,
-    weight_sparsity,
 )
+from edge_ai_compression.compression.pruning.sparsity import weight_sparsity
 from edge_ai_compression.core.experiment import CompressionConfig, PruningSection
 from edge_ai_compression.core.pipeline import CompressionPipeline
 from edge_ai_compression.core.registry import ModelRegistry

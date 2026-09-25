@@ -23,9 +23,6 @@ import torch.nn.functional as F
 import torch.nn.utils.prune as prune
 from torch.utils.data import DataLoader
 
-from edge_ai_compression.pretraining.config import TrainConfig
-from edge_ai_compression.pretraining.trainer import train_model
-
 METHODS = ("none", "finetune", "lora")
 
 
@@ -57,8 +54,12 @@ def _prunable(model: nn.Module) -> list[tuple[str, nn.Module]]:
     return [(n, m) for n, m in model.named_modules() if isinstance(m, nn.Conv2d | nn.Linear)]
 
 
-def _train_cfg(cfg: RecoveryConfig, device: str) -> TrainConfig:
-    return TrainConfig(
+def _train(model: nn.Module, loader: DataLoader, cfg: RecoveryConfig, device: str) -> None:
+    # Imported lazily: pretraining imports core, whose runner imports this module.
+    from edge_ai_compression.pretraining.config import TrainConfig
+    from edge_ai_compression.pretraining.trainer import train_model
+
+    train_cfg = TrainConfig(
         device=device,
         epochs=cfg.epochs,
         max_steps=cfg.max_steps,
@@ -68,6 +69,7 @@ def _train_cfg(cfg: RecoveryConfig, device: str) -> TrainConfig:
         schedule="cosine",
         log_every_steps=10,
     )
+    train_model(model, loader, train_cfg)
 
 
 def finetune_masked(model: nn.Module, loader: DataLoader, cfg: RecoveryConfig, device: str) -> None:
@@ -75,7 +77,7 @@ def finetune_masked(model: nn.Module, loader: DataLoader, cfg: RecoveryConfig, d
     for _, mod in layers:
         prune.custom_from_mask(mod, "weight", (mod.weight.detach() != 0).to(mod.weight.dtype))
     try:
-        train_model(model, loader, _train_cfg(cfg, device))
+        _train(model, loader, cfg, device)
     finally:
         for _, mod in layers:
             with contextlib.suppress(ValueError):
@@ -134,7 +136,7 @@ def lora_recover(model: nn.Module, loader: DataLoader, cfg: RecoveryConfig, devi
         _set(model, name, lora)
         wrapped.append((name, lora))
     n_adapter = sum(lora.lora_a.numel() + lora.lora_b.numel() for _, lora in wrapped)
-    train_model(model, loader, _train_cfg(cfg, device))
+    _train(model, loader, cfg, device)
     for name, lora in wrapped:
         _set(model, name, lora.merged())
     for p in model.parameters():
@@ -152,17 +154,3 @@ def recover(model: nn.Module, loader: DataLoader | None, cfg: RecoveryConfig, de
         finetune_masked(model, loader, cfg, device)
     else:
         lora_recover(model, loader, cfg, device)
-
-
-def weight_sparsity(model: nn.Module) -> float:
-    """Fraction of exactly-zero conv/linear weights (quantized wrappers included)."""
-    from edge_ai_compression.compression.quantization.modules import QuantLayer
-
-    total = zeros = 0
-    for mod in model.modules():
-        if not isinstance(mod, nn.Conv2d | nn.Linear | QuantLayer):
-            continue
-        w = mod.weight.detach()
-        total += w.numel()
-        zeros += int((w == 0).sum())
-    return zeros / max(total, 1)
