@@ -1,0 +1,34 @@
+# Base for the ResNet-18 / CIFAR-10 pruning + recovery ladder
+# (sweeps/prune_ladder_resnet18_cifar10.yml). Each rung prunes the same trained
+# checkpoint and runs on the kernel matching its structure: unstructured ->
+# edge_csr, 2:4 -> edge_sparse24, channel-pruned (smaller dense) -> edge_f32.
+model: resnet18_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 128
+num_workers: 4
+device: cpu
+seed: 0
+checkpoint_in: models/resnet18_cifar10_seed0.pt
+checkpoint_out: models/prune_ladder_last.pt
+compression_order_tag: prune
+compression:
+  quantization: {enabled: false}
+  distillation: {enabled: false}
+  pruning:
+    enabled: true
+    mode: global_unstructured
+    amount: 0.5
+    recovery: {method: none}
+benchmark:
+  backend: edge_csr
+  batch_size: 1
+  num_threads: 1
+  warmup_iters: 20
+  min_warmup_s: 0.5
+  iters: 200
+  process_repeats: 5
+  strict_environment: true
+experiment_db:
+  results_dir: results
+  diagnostics_max_batches: 40

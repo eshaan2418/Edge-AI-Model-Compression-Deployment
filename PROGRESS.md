@@ -36,8 +36,8 @@ Resume point for autonomous work. Updated after every commit.
   (Hutchinson + ILP), smoothquant (+ outlier_stats); ViT t/s/m; ImageNet loader + torchvision
   pretrained models for paper validation.
 - Engine `edge_quant`: per-layer exact lowering (D3.6); torch.ao removed (D3.5).
-- Resumable grid sweeps (`axes:`), dotted `--set` overrides, DB merge, `run_phase3` (smoke-tested),
-  `notebooks/phase3_ladder.ipynb`. Docs: docs/quantization.md.
+- Resumable grid sweeps (`axes:`), dotted `--set` overrides, DB merge, `run_track` (smoke-tested),
+  `notebooks/tracks.ipynb`. Docs: docs/quantization.md.
 - Results PENDING (heavy runs, see NEEDS ESHAAN 4-6).
 
 ### Next: Phase 4 (pruning + recovery), branch `phase4-pruning` stacked on `phase3-ptq`
@@ -70,11 +70,11 @@ fine-tuning; lower to engine (sparse24/csr, channel-pruned dense); connect to Ph
    python -m edge_ai_compression.analysis.kernel_study --results results --study kernel_sparsity_m5
    ```
    Results land in `results/` (experiment DB). The strict environment check refuses to run on battery.
-4. **Phase 3 ResNet-18 ladder (GPU, Colab/Kaggle):** open `notebooks/phase3_ladder.ipynb`, run all
+4. **Phase 3 ResNet-18 ladder (GPU, Colab/Kaggle):** open `notebooks/tracks.ipynb`, run all
    cells for the resnet18 track (trains 3 seeds x 60 epochs, then 36 ladder runs). Or locally with
-   the M5 GPU: `python -m edge_ai_compression.experiments.run_phase3 --track resnet18 --device mps`.
-   Download `phase3_results.zip` and merge: `python -m edge_ai_compression.experiment_db.merge --src <dir>/results`.
-5. **Phase 3 ViT track:** same notebook, vit_s track (3 seeds x 200 epochs + 21 runs).
+   the M5 GPU: `python -m edge_ai_compression.experiments.run_track --track resnet18_ptq --device mps`.
+   Download `track_results.zip` and merge: `python -m edge_ai_compression.experiment_db.merge --src <dir>/results`.
+5. **Phase 3 ViT track:** same notebook, vit_s_ptq track (3 seeds x 200 epochs + 21 runs).
 6. **(Optional) ImageNet validation vs the papers:** needs ImageNet-1k (license-gated) in
    `data/imagenet/{train,val}` ImageFolder layout, then
    `python launch_sweep.py --config edge_ai_compression/configs/sweeps/ptq_validation_imagenet.yml --set device=cuda`.

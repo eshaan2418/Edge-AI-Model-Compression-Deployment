@@ -42,10 +42,10 @@ weights. Anything else raises. ViTs are simulation-only (D3.8).
 
 ```bash
 # Local smoke of the whole Phase 3 flow (synthetic data):
-python -m edge_ai_compression.experiments.run_phase3 --smoke --seeds 0 --results /tmp/r --models /tmp/m
-# Real runs (Colab/Kaggle GPU): notebooks/phase3_ladder.ipynb, or directly:
-python -m edge_ai_compression.experiments.run_phase3 --track resnet18 --device cuda
-python -m edge_ai_compression.experiments.run_phase3 --track vit_s --device cuda
+python -m edge_ai_compression.experiments.run_track --track resnet18_ptq --smoke --seeds 0 --results /tmp/r --models /tmp/m
+# Real runs (Colab/Kaggle GPU): notebooks/tracks.ipynb, or directly:
+python -m edge_ai_compression.experiments.run_track --track resnet18_ptq --device cuda
+python -m edge_ai_compression.experiments.run_track --track vit_s_ptq --device cuda
 ```
 
 Sweeps: `configs/sweeps/ptq_ladder_resnet18_cifar10.yml` (3 seeds × 12 rungs),

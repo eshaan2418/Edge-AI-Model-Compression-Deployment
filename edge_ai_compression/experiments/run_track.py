@@ -1,6 +1,8 @@
-"""Phase 3 end to end: train baseline seeds, then run the PTQ/QAT ladder sweeps.
+"""Run a study track end to end: train baseline seeds, then run the track's sweep.
 
-Used by notebooks/phase3_ladder.ipynb on Colab/Kaggle (``--device cuda``).
+Tracks: resnet18_ptq / vit_s_ptq (Phase 3 PTQ/QAT ladder), resnet18_prune
+(Phase 4 pruning + recovery ladder). Used by the Colab/Kaggle notebooks
+(``--device cuda``); training is skipped for seeds whose checkpoint exists.
 ``--smoke`` runs the same code path on synthetic data with tiny settings (CI /
 pytest) and writes to ``--results``.
 """
@@ -19,8 +21,9 @@ from edge_ai_compression.utils.overrides import apply_overrides
 
 CONFIGS = Path("edge_ai_compression/configs")
 TRACKS = {
-    "resnet18": ("train/resnet18_cifar10.yml", "sweeps/ptq_ladder_resnet18_cifar10.yml"),
-    "vit_s": ("train/vit_s_cifar10.yml", "sweeps/ptq_ladder_vit_s_cifar10.yml"),
+    "resnet18_ptq": ("train/resnet18_cifar10.yml", "sweeps/ptq_ladder_resnet18_cifar10.yml"),
+    "vit_s_ptq": ("train/vit_s_cifar10.yml", "sweeps/ptq_ladder_vit_s_cifar10.yml"),
+    "resnet18_prune": ("train/resnet18_cifar10.yml", "sweeps/prune_ladder_resnet18_cifar10.yml"),
 }
 SMOKE_TRAIN = {
     "dataset": "fake",
@@ -46,15 +49,26 @@ SMOKE_BASE = {
 }
 
 
+def _shrink(rung: dict[str, Any]) -> dict[str, Any]:
+    """Tiny iteration counts for reconstruction / recovery options inside a rung."""
+    comp = rung.get("compression", {})
+    q = comp.get("quantization", {})
+    for method in ("adaround", "brecq"):
+        if method in q:
+            q[method] = {**q[method], "iters": 2, "num_samples": 16, "batch_size": 8}
+    if "qat" in q:
+        q["qat"] = {**q["qat"], "max_steps": 2}
+    rec = comp.get("pruning", {}).get("recovery")
+    if rec:
+        comp["pruning"]["recovery"] = {**rec, "max_steps": 2}
+    return rung
+
+
 def _smoke_sweep(spec: dict[str, Any]) -> dict[str, Any]:
-    """First two rungs plus the first reconstruction rung, with 2 iterations."""
+    """First two rungs plus the first rung that trains (reconstruction/QAT/recovery)."""
     seeds, rungs = spec["axes"]
-    keep = rungs[:2] + [r for r in rungs if "adaround" in str(r)][:1]
-    for rung in keep:
-        q = rung.get("compression", {}).get("quantization", {})
-        if "adaround" in q:
-            q["adaround"] = {**q["adaround"], "iters": 2, "num_samples": 16, "batch_size": 8}
-    return {**spec, "axes": [seeds, keep]}
+    trains = [r for r in rungs[2:] if any(k in str(r) for k in ("adaround", "recovery", "qat"))]
+    return {**spec, "axes": [seeds, [_shrink(r) for r in rungs[:2] + trains[:1]]]}
 
 
 def run(
@@ -69,8 +83,8 @@ def run(
     train_path, sweep_path = TRACKS[track]
     model_prefix = train_path.split("/")[1].removesuffix(".yml")
     for seed in seeds:
-        if skip_train:
-            break
+        if skip_train or (models / f"{model_prefix}_seed{seed}.pt").is_file():
+            continue
         cfg = apply_overrides(
             load_yaml(CONFIGS / train_path),
             {
@@ -102,13 +116,13 @@ def run(
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    p.add_argument("--track", choices=sorted(TRACKS), default="resnet18")
+    p.add_argument("--track", choices=sorted(TRACKS), required=True)
     p.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
     p.add_argument("--device", default="cpu")
     p.add_argument("--results", type=Path, default=Path("results"))
     p.add_argument("--models", type=Path, default=Path("models"))
     p.add_argument("--smoke", action="store_true")
-    p.add_argument("--skip-train", action="store_true", help="checkpoints already exist")
+    p.add_argument("--skip-train", action="store_true", help="never train (checkpoints exist)")
     a = p.parse_args()
     run(a.track, a.seeds, a.device, a.results, a.models, a.smoke, a.skip_train)
 

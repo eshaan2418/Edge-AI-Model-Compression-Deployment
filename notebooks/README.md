@@ -6,4 +6,4 @@ with `python -m edge_ai_compression.experiment_db.merge`. Keep outputs out of gi
 
 | Notebook | Runs |
 |---|---|
-| `phase3_ladder.ipynb` | Baseline training (3 seeds) + PTQ/QAT ladder sweeps (`run_phase3`) |
+| `tracks.ipynb` | Baseline training + every study track's sweep (`run_track`): PTQ/QAT ladder, ViT SmoothQuant, pruning + recovery |

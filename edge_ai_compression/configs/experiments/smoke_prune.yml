@@ -1,0 +1,33 @@
+# Offline smoke test of Phase 4: 2:4 pruning + masked LoRA recovery (2 steps),
+# lowered to the 2:4 sparse kernel. Needs the kernels built.
+model: resnet18_cifar
+dataset: fake
+data_dir: data
+batch_size: 8
+num_workers: 0
+device: cpu
+seed: 42
+limit_samples: 16
+checkpoint_out: models/smoke_prune.pt
+compression_order_tag: prune
+compression:
+  quantization: {enabled: false}
+  distillation: {enabled: false}
+  pruning:
+    enabled: true
+    mode: nm
+    n: 2
+    m: 4
+    recovery: {method: lora, max_steps: 2, rank: 4, lr: 0.01}
+benchmark:
+  backend: edge_sparse24
+  batch_size: 1
+  num_threads: 1
+  warmup_iters: 2
+  min_warmup_s: 0.0
+  iters: 5
+  process_repeats: 2
+  strict_environment: false
+experiment_db:
+  results_dir: results/smoke
+  diagnostics_max_batches: 1

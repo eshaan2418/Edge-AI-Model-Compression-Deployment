@@ -1,0 +1,22 @@
+# Phase 4 ladder on ResNet-18 / CIFAR-10: 3 seeds x 13 rungs = 39 runs.
+# Recovery at equal budgets: 5 epochs, lr 0.01 cosine, for both full masked
+# fine-tuning and masked LoRA (rank 16). Needs models/resnet18_cifar10_seed{0,1,2}.pt.
+sweep_id: prune_ladder_resnet18_cifar10
+base_config: edge_ai_compression/configs/experiments/ladder/resnet18_cifar10_prune_base.yml
+axes:
+  - - {seed: 0, checkpoint_in: models/resnet18_cifar10_seed0.pt}
+    - {seed: 1, checkpoint_in: models/resnet18_cifar10_seed1.pt}
+    - {seed: 2, checkpoint_in: models/resnet18_cifar10_seed2.pt}
+  - - {compression_order_tag: baseline, compression: {pruning: {enabled: false}}, benchmark: {backend: edge_f32}}
+    - {compression: {pruning: {mode: global_unstructured, amount: 0.5}}}
+    - {compression: {pruning: {mode: global_unstructured, amount: 0.5, recovery: {method: finetune, epochs: 5, lr: 0.01}}}}
+    - {compression: {pruning: {mode: global_unstructured, amount: 0.5, recovery: {method: lora, epochs: 5, lr: 0.01, rank: 16}}}}
+    - {compression: {pruning: {mode: global_unstructured, amount: 0.9, recovery: {method: finetune, epochs: 5, lr: 0.01}}}}
+    - {compression: {pruning: {mode: global_unstructured, amount: 0.9, recovery: {method: lora, epochs: 5, lr: 0.01, rank: 16}}}}
+    - {compression: {pruning: {mode: nm, n: 2, m: 4}}, benchmark: {backend: edge_sparse24}}
+    - {compression: {pruning: {mode: nm, n: 2, m: 4, recovery: {method: finetune, epochs: 5, lr: 0.01}}}, benchmark: {backend: edge_sparse24}}
+    - {compression: {pruning: {mode: nm, n: 2, m: 4, recovery: {method: lora, epochs: 5, lr: 0.01, rank: 16}}}, benchmark: {backend: edge_sparse24}}
+    - {compression: {pruning: {mode: channel, amount: 0.25, recovery: {method: finetune, epochs: 5, lr: 0.01}}}, benchmark: {backend: edge_f32}}
+    - {compression: {pruning: {mode: channel, amount: 0.25, recovery: {method: lora, epochs: 5, lr: 0.01, rank: 16}}}, benchmark: {backend: edge_f32}}
+    - {compression: {pruning: {mode: channel, amount: 0.5, recovery: {method: finetune, epochs: 5, lr: 0.01}}}, benchmark: {backend: edge_f32}}
+    - {compression: {pruning: {mode: channel, amount: 0.5, recovery: {method: lora, epochs: 5, lr: 0.01, rank: 16}}}, benchmark: {backend: edge_f32}}
