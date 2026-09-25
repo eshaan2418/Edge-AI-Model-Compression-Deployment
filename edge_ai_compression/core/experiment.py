@@ -134,7 +134,10 @@ class QuantizationSection:
         bits = (
             f"avg{self.options.get('avg_bits', 6.0)}" if self.method == "hawq" else self.weight_bits
         )
-        return f"{self.method}:w{bits}{act}:{gran}"
+        tag = f"{self.method}:w{bits}{act}:{gran}"
+        if self.act_bits is not None:  # calibration changes the result; make it part of the tag
+            tag += f":{self.calibration.get('method', 'minmax')}"
+        return tag
 
     def to_dict(self) -> dict[str, Any]:
         """YAML shape (method options under the method's key); round-trips with from_dict."""

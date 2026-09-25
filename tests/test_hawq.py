@@ -58,7 +58,7 @@ def test_hawq_pipeline_assigns_mixed_bits_within_budget():
             "hawq": {"avg_bits": 6.0, "hutchinson_iters": 5, "hutchinson_samples": 16},
         }
     )
-    assert sec.tag == "hawq:wavg6.0a8:per_channel"
+    assert sec.tag == "hawq:wavg6.0a8:per_channel:minmax"
     q = run_quantization(m, sec, loader, "cpu")
     layers = quant_layers(q)
     bits = {n: layer.spec.bits for n, layer in layers}

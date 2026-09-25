@@ -13,7 +13,7 @@ import pandas as pd
 
 from edge_ai_compression.pretraining.signals import SCALAR_FIELDS
 
-W4A8 = ("none", "rtn:w4a8:per_channel")
+W4A8 = ("none", "rtn:w4a8:per_channel:minmax")
 
 
 def write_early_prediction_db(root: Path, seed: int = 0) -> Path:

@@ -40,7 +40,7 @@ def _sec(**kw) -> QuantizationSection:
 def test_config_parsing_and_errors():
     sec = _sec(weight_bits=4, act_bits=None, group_size=32)
     assert sec.granularity == "per_group" and sec.tag == "rtn:w4afp:g32"
-    assert _sec().tag == "rtn:w8a8:per_channel"
+    assert _sec().tag == "rtn:w8a8:per_channel:minmax"
     with pytest.raises(ValueError, match="replaced by quantization.method"):
         QuantizationSection.from_dict({"mode": "dynamic_linear"})
     with pytest.raises(ValueError, match="unknown quantization method"):
