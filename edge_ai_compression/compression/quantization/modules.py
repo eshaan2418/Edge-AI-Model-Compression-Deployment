@@ -42,6 +42,25 @@ class QuantLayer(nn.Module):
         self.act_enabled = False  # set by calibration
         self.alpha: nn.Parameter | None = None  # AdaRound rounding logits over [M, K]
         self.hard_round = False
+        self.lsq = False  # learnable step sizes (QAT)
+
+    def enable_lsq(self) -> None:
+        """Make weight and activation scales learnable with LSQ gradient scaling."""
+        if self.alpha is not None:
+            raise ValueError("LSQ and AdaRound rounding are mutually exclusive")
+        for name in ("w_scale", "a_scale"):
+            value = getattr(self, name).detach().clone()
+            del self._buffers[name]
+            setattr(self, name, nn.Parameter(value))
+        self.lsq = True
+
+    def _lsq_scale(self, scale: torch.Tensor, numel: int, bits: int) -> torch.Tensor:
+        if not self.lsq:
+            return scale
+        # LSQ (Esser et al. 2020): scale the step-size gradient by 1/sqrt(numel * qmax).
+        g = 1.0 / (numel * qmax(bits)) ** 0.5
+        s = scale.clamp_min(1e-8)
+        return (s - s * g).detach() + s * g
 
     # --------------------------------------------------------------- weight --
     def _w2d(self) -> torch.Tensor:
@@ -68,7 +87,9 @@ class QuantLayer(nn.Module):
 
     def quant_weight(self) -> torch.Tensor:
         if self.alpha is None:
-            return fake_quant_weight(self.weight, self.w_scale, self.spec)
+            per_scale = self.weight.numel() // self.w_scale.numel()
+            scale = self._lsq_scale(self.w_scale, per_scale, self.spec.bits)
+            return fake_quant_weight(self.weight, scale, self.spec)
         w, s, q = self._w2d(), self._s2d(), qmax(self.spec.bits)
         codes = torch.clamp(torch.floor(w.detach() / s) + self.rounding(), -q, q)
         return (codes * s).reshape(self.weight.shape)
@@ -85,11 +106,12 @@ class QuantLayer(nn.Module):
     def quant_input(self, x: torch.Tensor) -> torch.Tensor:
         if self.act_bits is None or not self.act_enabled:
             return x
-        return fake_quant(x, self.a_scale, self.act_bits)
+        scale = self._lsq_scale(self.a_scale, x[0].numel(), self.act_bits)
+        return fake_quant(x, scale, self.act_bits)
 
     def extra_repr(self) -> str:
         act = f"a{self.act_bits}" if self.act_bits else "a-fp"
-        rnd = "adaround" if self.alpha is not None else "nearest"
+        rnd = "adaround" if self.alpha is not None else ("lsq" if self.lsq else "nearest")
         return f"w{self.spec.bits}/{self.spec.granularity}, {act}, {rnd}"
 
 

@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 
 from edge_ai_compression.compression.quantization.calibration import calibrate_activations
 from edge_ai_compression.compression.quantization.modules import fold_bn, quantize_model
+from edge_ai_compression.compression.quantization.qat import QATConfig, quantization_aware_finetune
 from edge_ai_compression.compression.quantization.quantizer import WeightSpec
 from edge_ai_compression.compression.quantization.reconstruction import (
     ReconstructionConfig,
@@ -58,4 +59,8 @@ def run_quantization(
             granularity=granularity,
             device=device,
         )
+    if sec.method == "qat":
+        if loader is None:
+            raise ValueError("qat needs training data (a train loader)")
+        quantization_aware_finetune(model, loader, QATConfig.from_dict(sec.options), device)
     return model

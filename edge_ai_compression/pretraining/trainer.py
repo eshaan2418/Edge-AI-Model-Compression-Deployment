@@ -73,7 +73,8 @@ def train_model(
     ckpt_steps = set(log_spaced_steps(total, cfg.num_checkpoints))
     decay, no_decay = [], []
     for name, p in model.named_parameters():
-        (no_decay if p.ndim <= 1 or name.endswith(".bias") else decay).append(p)
+        exempt = p.ndim <= 1 or name.endswith((".bias", "_scale"))  # BN, biases, quant scales
+        (no_decay if exempt else decay).append(p)
     opt = torch.optim.SGD(
         [
             {"params": decay, "weight_decay": cfg.weight_decay},

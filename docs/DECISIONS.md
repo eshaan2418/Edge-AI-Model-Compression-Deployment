@@ -153,3 +153,7 @@ All methods quantize a **BN-folded** model (conv bias absorbs BN) into `QuantCon
 - **Finding:** C++ `quantize_s8` multiplied by `1/scale` while the simulation divides. Last-bit differences flipped rounding ties, and a W8A8 ResNet-18 differed by 1.6% relative at the logits. Fixed: the kernel now divides.
 - **Remaining, intrinsic:** the engine accumulates exactly in int32 and rescales once; the simulation accumulates dequantized products in fp32. Those differ at ~1e-7, which occasionally flips a value sitting exactly on a rounding boundary at the next layer's input quantization. One-step differences then compound in a deep net (about 1% at the logits for a random-weight ResNet-18). The same happens between any two correct int8 implementations.
 - **Test contract:** given identical inputs, every lowered layer matches its simulated layer to 1e-5 relative; end to end, relative error < 5% with identical argmax. Accuracy numbers are always measured with the backend that is benchmarked.
+
+### D3.7 QAT keeps BatchNorm folded
+- **Alternatives:** keep BN unfolded during QAT and fold at the end, freezing BN statistics after a few epochs (Krishnamoorthi 2018; Jacob et al. 2018).
+- **Why:** starting from the calibrated, BN-folded PTQ model keeps one model representation across the ladder and makes the QAT result directly lowerable to the engine. The cost is that the model can't re-estimate BN statistics under quantization noise. Fine for short fine-tunes; a limitation for long QAT.
