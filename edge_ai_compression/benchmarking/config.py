@@ -10,6 +10,7 @@ RENAMED_KEYS = {
     "latency_warmup": "warmup_iters",
     "results_md": None,
     "results_jsonl": None,
+    "input_shape": "batch_size (spatial dims come from the dataset)",
 }
 
 
@@ -17,12 +18,15 @@ RENAMED_KEYS = {
 class BenchmarkConfig:
     """How latency and memory are measured.
 
+    The benchmark input is ``(batch_size, *sample_shape)`` where the sample shape
+    comes from the dataset (or ``--input-shape`` in the standalone CLI).
+
     Each of ``process_repeats`` fresh processes runs at least ``warmup_iters``
     untimed iterations (and for at least ``min_warmup_s``), then at least
     ``iters`` timed iterations (and for at least ``min_time_s``).
     """
 
-    input_shape: tuple[int, ...] = (1, 3, 32, 32)
+    batch_size: int = 1
     num_threads: int = 4
     warmup_iters: int = 50
     min_warmup_s: float = 1.0
@@ -34,9 +38,7 @@ class BenchmarkConfig:
     strict_environment: bool = True
 
     def __post_init__(self) -> None:
-        if len(self.input_shape) < 2 or any(d < 1 for d in self.input_shape):
-            raise ValueError(f"input_shape must be positive with a batch dim: {self.input_shape}")
-        for name in ("num_threads", "iters", "process_repeats"):
+        for name in ("batch_size", "num_threads", "iters", "process_repeats"):
             if getattr(self, name) < 1:
                 raise ValueError(f"benchmark.{name} must be >= 1")
         for name in ("warmup_iters", "min_warmup_s", "min_time_s"):
@@ -44,10 +46,6 @@ class BenchmarkConfig:
                 raise ValueError(f"benchmark.{name} must be >= 0")
         if self.cpu_affinity is not None and not self.cpu_affinity:
             raise ValueError("benchmark.cpu_affinity must be omitted or non-empty")
-
-    @property
-    def batch_size(self) -> int:
-        return self.input_shape[0]
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> BenchmarkConfig:
@@ -61,11 +59,9 @@ class BenchmarkConfig:
                 raise ValueError(f"benchmark.{key} was {hint}")
             raise ValueError(f"unknown benchmark key '{key}'; expected one of {sorted(known)}")
         kwargs: dict[str, Any] = dict(d)
-        if "input_shape" in kwargs:
-            kwargs["input_shape"] = tuple(int(x) for x in kwargs["input_shape"])
         if kwargs.get("cpu_affinity") is not None:
             kwargs["cpu_affinity"] = tuple(int(x) for x in kwargs["cpu_affinity"])
-        for name in ("num_threads", "warmup_iters", "iters", "process_repeats"):
+        for name in ("batch_size", "num_threads", "warmup_iters", "iters", "process_repeats"):
             if name in kwargs:
                 kwargs[name] = int(kwargs[name])
         for name in ("min_warmup_s", "min_time_s"):
@@ -79,6 +75,5 @@ class BenchmarkConfig:
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
-        d["input_shape"] = list(self.input_shape)
         d["cpu_affinity"] = list(self.cpu_affinity) if self.cpu_affinity else None
         return d

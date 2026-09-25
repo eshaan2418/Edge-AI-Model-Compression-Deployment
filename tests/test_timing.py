@@ -103,14 +103,14 @@ def test_config_rejects_renamed_and_unknown_keys():
         BenchmarkConfig.from_dict({"latency_repeats": 5})
     with pytest.raises(ValueError, match="removed"):
         BenchmarkConfig.from_dict({"results_md": "x.md"})
+    with pytest.raises(ValueError, match="renamed to 'batch_size"):
+        BenchmarkConfig.from_dict({"input_shape": [1, 3, 32, 32]})
     with pytest.raises(ValueError, match="unknown benchmark key"):
         BenchmarkConfig.from_dict({"itres": 5})
 
 
 def test_config_parses_and_validates():
-    cfg = BenchmarkConfig.from_dict(
-        {"input_shape": [8, 3, 32, 32], "iters": "20", "cpu_affinity": [0, 1]}
-    )
+    cfg = BenchmarkConfig.from_dict({"batch_size": 8, "iters": "20", "cpu_affinity": [0, 1]})
     assert cfg.batch_size == 8
     assert cfg.iters == 20
     assert cfg.cpu_affinity == (0, 1)
