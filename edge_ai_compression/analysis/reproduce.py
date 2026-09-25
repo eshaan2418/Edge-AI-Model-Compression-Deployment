@@ -13,9 +13,7 @@ import traceback
 from collections.abc import Callable
 from pathlib import Path
 
-import pandas as pd
-
-from edge_ai_compression.analysis.errors import InsufficientData
+from edge_ai_compression.analysis.common import InsufficientData, read_table
 from edge_ai_compression.experiments.compress_runs import PANEL
 
 
@@ -27,7 +25,7 @@ def _kernel_study(results: Path, out: Path) -> list[Path]:
         roofline_table,
     )
 
-    kernels = pd.read_csv(results / "kernel_benchmarks.csv")
+    kernels = read_table(results / "kernel_benchmarks.csv")
     written = []
     for study in sorted(kernels["study"].unique()):
         if study.startswith("smoke"):
@@ -86,13 +84,13 @@ def _scaling(results: Path, out: Path) -> list[Path]:
 def _latency_proxy(results: Path, out: Path) -> list[Path]:
     from edge_ai_compression.analysis import latency_proxy as lp
 
-    exps = pd.read_csv(results / "experiments.csv")
+    exps = read_table(results / "experiments.csv")
     path = out / "latency_naive_correlations.csv"
     lp.naive_correlations(exps).to_csv(path, index=False)
     written = [path]
     kernels_path = results / "kernel_benchmarks.csv"
     if kernels_path.is_file():
-        kernels = pd.read_csv(kernels_path)
+        kernels = read_table(kernels_path)
         for fp, k in kernels.groupby("fingerprint_hash"):
             machine = exps[exps["fingerprint_hash"] == fp]
             shapes = {}
@@ -114,7 +112,7 @@ def _latency_proxy(results: Path, out: Path) -> list[Path]:
 def _pareto(results: Path, out: Path) -> list[Path]:
     from edge_ai_compression.analysis.pareto_report import frontier, plot_frontier
 
-    table = frontier(pd.read_csv(results / "experiments.csv"))
+    table = frontier(read_table(results / "experiments.csv"))
     table.to_csv(out / "pareto.csv", index=False)
     return [plot_frontier(table, out / "pareto.png")]
 
@@ -171,8 +169,11 @@ def main() -> None:
     p.add_argument("--results", type=Path, default=Path("results"))
     p.add_argument("--out", type=Path, default=Path("results/figures"))
     a = p.parse_args()
-    for name, state in reproduce(a.results, a.out).items():
+    status = reproduce(a.results, a.out)
+    for name, state in status.items():
         print(f"{name}: {state}")
+    if "error" in status.values():
+        raise SystemExit(f"analysis errors: see {a.out / 'MANIFEST.md'}")
 
 
 if __name__ == "__main__":

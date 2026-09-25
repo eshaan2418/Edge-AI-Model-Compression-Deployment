@@ -34,7 +34,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from edge_ai_compression.analysis.errors import InsufficientData
+from edge_ai_compression.analysis.common import InsufficientData, read_table
 from edge_ai_compression.experiments.compress_runs import method_tag
 from edge_ai_compression.pretraining.signals import SCALAR_FIELDS
 
@@ -80,9 +80,9 @@ PREDICTORS: dict[str, Callable[[], RegressorMixin]] = {
 
 
 def load_tables(results_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    runs = pd.read_csv(results_dir / "training_runs.csv")
-    signals = pd.read_csv(results_dir / "training_signals.csv")
-    exps = pd.read_csv(results_dir / "experiments.csv")
+    runs = read_table(results_dir / "training_runs.csv")
+    signals = read_table(results_dir / "training_signals.csv")
+    exps = read_table(results_dir / "experiments.csv")
     return runs, signals, exps
 
 

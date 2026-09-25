@@ -40,3 +40,17 @@ def test_all_steps_covers_every_checkpoint(trained):
     overrides = {"limit_samples": 16, "batch_size": 8, "num_workers": 0}
     n = compress_runs(trained, methods=["w8a8"], all_steps=True, overrides=overrides)
     assert n > 0  # intermediate checkpoints added (the final ones were already done)
+
+
+def test_reproduce_on_real_schema_db_has_no_code_errors(trained, tmp_path):
+    from edge_ai_compression.analysis.reproduce import reproduce
+
+    compress_runs(
+        trained,
+        methods=["w8a8"],
+        overrides={"limit_samples": 16, "batch_size": 8, "num_workers": 0},
+    )
+    status = reproduce(trained, tmp_path / "fig")
+    assert "error" not in status.values(), (tmp_path / "fig" / "MANIFEST.md").read_text()
+    assert status["kernel study + roofline"] == "PENDING"
+    assert (tmp_path / "fig" / "pareto.csv").is_file()

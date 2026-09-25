@@ -28,7 +28,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.linear_model import LinearRegression, Ridge
 
-from edge_ai_compression.analysis.errors import InsufficientData
+from edge_ai_compression.analysis.common import InsufficientData, read_table
 from edge_ai_compression.experiment_db.paths import artifact_dir
 
 BACKEND_OP = {
@@ -162,9 +162,9 @@ def main() -> None:
     p.add_argument("--out", type=Path, default=Path("results/figures"))
     a = p.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
-    exps = pd.read_csv(a.results / "experiments.csv")
+    exps = read_table(a.results / "experiments.csv")
     naive_correlations(exps).to_csv(a.out / "latency_naive_correlations.csv", index=False)
-    kernels = pd.read_csv(a.results / "kernel_benchmarks.csv")
+    kernels = read_table(a.results / "kernel_benchmarks.csv")
     for fp, k in kernels.groupby("fingerprint_hash"):
         machine = exps[exps["fingerprint_hash"] == fp]
         shapes = {}

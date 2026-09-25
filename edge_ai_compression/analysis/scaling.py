@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import OptimizeWarning, curve_fit
 
+from edge_ai_compression.analysis.common import read_table
 from edge_ai_compression.experiments.compress_runs import method_tag
 
 
@@ -59,8 +60,8 @@ def scaling_points(
     results_dir: Path, method: str, x: str, filters: dict[str, object] | None = None
 ) -> pd.DataFrame:
     """Per-run (x, accuracy_drop, variant, seed) for final checkpoints under ``method``."""
-    runs = pd.read_csv(results_dir / "training_runs.csv")
-    exps = pd.read_csv(results_dir / "experiments.csv")
+    runs = read_table(results_dir / "training_runs.csv")
+    exps = read_table(results_dir / "experiments.csv")
     prune_tag, quant_tag = method_tag(method)
     exps = exps[(exps["pruning_type"] == prune_tag) & (exps["quantization_type"] == quant_tag)]
     df = exps.merge(runs, left_on="source_run_id", right_on="run_id")
