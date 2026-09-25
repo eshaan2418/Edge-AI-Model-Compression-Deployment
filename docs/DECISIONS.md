@@ -255,3 +255,19 @@ Rows go to `training_signals.csv` (run id, step, scalar summaries), with per-lay
 
 ### D6.3 FLOPs counted from per-layer GEMM shapes, including quantized layers
 - **Bug found:** `estimate_flops_macs` hooked only `nn.Conv2d`/`nn.Linear`, so every quantized run (QuantConv2d/QuantLinear) had `flops = 0` in the DB, and it crashed on [B, T, C] inputs (ViT). Now `layer_gemm_shapes` records (M, N, K) per float or quantized layer; FLOPs are batch × Σ M·N·K. The per-layer shapes are also stored in each run's `metrics.json` for the latency-proxy study (channel-pruned shapes can't be recovered from the model name).
+
+---
+
+## Phase 7: paper, blog, README
+
+### D7.1 Paper tables are generated, never typed
+- `analysis/paper_tables.py` renders every paper table from the DB / `reproduce.sh` outputs into `paper/generated/*.tex`. Tables without results render as `\pending{<run that fills it>}`, so the paper compiles at every stage. `reproduce.sh` writes paper tables only when regenerating from the real DB (`results/`), so smoke numbers can't reach the paper.
+
+### D7.2 The headline stays PENDING until a human reads the results
+- A headline claim needs judgment about effect sizes and CIs, so it isn't auto-generated. The abstract, README and blog carry an explicit PENDING marker until the Phase 5/6 runs exist.
+
+### D7.3 Paper compiled in CI; references flagged for verification
+- No local TeX installation, so CI compiles the paper (latex-action pinned by SHA) and uploads the PDF. `refs.bib` was written from knowledge of the cited papers, and `paper/README.md` requires verifying each entry against the publisher's page before submission.
+
+### D7.4 The measurement pitfalls in the blog and paper appendix are described qualitatively
+- The magnitudes observed during development (from CI logs and development runs) are recorded in these DECISIONS entries with their context. They aren't experiment-DB results, so the blog and paper describe them without numbers.

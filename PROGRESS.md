@@ -4,7 +4,7 @@ Resume point for autonomous work. Updated after every commit.
 
 - **Mission:** see the mission brief (pre-training → post-training/compression → export → C++ inference → benchmark → analysis).
 - **Decisions:** `docs/DECISIONS.md`. **Interview prep:** `docs/INTERVIEW_PREP.md`.
-- **Branch stack:** `main` ← `consolidate` (Phase 0) ← `phase1-benchmarking` ← `phase2-kernels` ← ...
+- **Branch stack:** `main` (has phases 0-3 via PRs #3-#6) ← `phase4-pruning` ← `phase5-pretraining` ← `phase6-studies` ← `phase7-paper`. Merge in order.
 - **Environment:** `.venv/` (Python 3.12 locally, CI 3.11). Checks before every commit:
   `ruff check . && ruff format --check . && pytest -q`.
 
@@ -61,9 +61,14 @@ Resume point for autonomous work. Updated after every commit.
 - Fixes: FLOPs = 0 for quantized models (D6.3), MLP predictor arg, float-parsed empty id column.
 - Docs: docs/analysis.md. All results PENDING on the heavy runs (NEEDS ESHAAN 3-9).
 
-### Next: Phase 7 (paper + blog), branch `phase7-paper`
-paper/ (LaTeX, workshop length) + docs/blog.md + README headline, all with [PENDING] markers
-where results don't exist; figures only via reproduce.sh.
+### Phase 7 (paper + blog): COMPLETE (write-up with PENDING results), pushed on `phase7-paper`
+- paper/main.tex + refs.bib (verify entries), tables generated from the DB by
+  analysis/paper_tables.py via reproduce.sh (PENDING until runs), CI compiles the paper.
+- docs/blog.md; README rewritten (headline PENDING, one-command reproduce, architecture).
+
+### Status: phases 0-7 code complete. What remains is running the experiments (NEEDS ESHAAN),
+then `./reproduce.sh`, then writing the headline finding from `results/figures/`.
+Phase 8 (small-LM track) is not started: it is gated on 1-7 having real results.
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)

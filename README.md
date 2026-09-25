@@ -1,163 +1,83 @@
-<div align="center">
+# Is compressibility predictable early?
 
-# Hardware‑Aware Neural Network Compression & AutoML (Edge)
+Does compression-awareness during training produce models that quantize and prune better
+after training and run faster at inference? And can a model's final compressibility be
+predicted early, from cheap training-time signals?
 
-Smaller, faster, still‑accurate deep‑learning models for edge devices — with a
-research pipeline for searching the compression trade‑off space.
+This repository is the full measured lifecycle for answering that:
 
-</div>
+```
+train (variants, signals) → post-train (quantize / prune / recover) → lower to C++ kernels
+      → benchmark (fresh processes, CIs, fingerprint) → analysis → paper
+```
 
-The primary stack is a **PyTorch research framework** in `edge_ai_compression/`:
-end‑to‑end compression experiments on CPU (prune / quantize / distill),
-benchmarking, multi‑objective search, Pareto analysis, and experiment tracking.
-Everything runs on a normal **CPU**; no GPU needed.
+**Headline finding:** [PENDING: written only from `results/figures/` after the Phase 5/6 runs.
+See `paper/` and `results/figures/MANIFEST.md`]
 
-Earlier code (a standalone PyTorch ResNet‑18 CLI and the TensorFlow / Keras
-TFLite scripts for ResNet50) is frozen under [`legacy/`](legacy/README.md).
+**Figure:** [PENDING: `results/figures/early_prediction_w4a8.png`, produced by `./reproduce.sh`]
 
----
+Every number in this README, the paper and the blog traces to a run ID in the experiment DB.
+Nothing is typed by hand.
 
-## Quickstart (5 minutes, CPU‑only)
+## Reproduce
 
 ```bash
-git clone https://github.com/eshaan2418/Edge-AI-Model-Compression-Deployment.git
-cd Edge-AI-Model-Compression-Deployment
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev,kernels,export,viz]"
+scripts/build_kernels.sh                 # C++ kernels (NEON / AVX2 / AVX-512)
 
-python3 -m venv .venv
-source .venv/bin/activate          # macOS/Linux  (Windows: .venv\Scripts\activate)
-python -m pip install -U pip
-
-# PyTorch research framework + dev tools (ruff, pytest):
-pip install -e ".[dev]"
-
-# Sanity check:
-ruff check .
-pytest -q                          # CPU only, no downloads
-
-# Tiny end‑to‑end experiment — fully offline, no downloads, seconds on CPU:
-python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
+./reproduce.sh                           # every figure + paper table from the experiment DB
 ```
 
-The smoke config (`smoke_cpu.yml`) uses a **synthetic `fake` dataset** (random
-CIFAR‑shaped tensors — no files, no network), prunes a ResNet‑18 to 50%
-sparsity, benchmarks it in fresh processes, and appends a row to the
-experiment DB under `results/smoke/`. Swap `dataset: fake` → `dataset: cifar10`
-in the config for a real run.
+The experiment DB (`results/`) is produced by:
 
-### Optional extras
+| What | Command |
+|---|---|
+| Local smoke of any study track (seconds, synthetic data) | `python -m edge_ai_compression.experiments.run_track --track <track> --smoke --seeds 0 --results /tmp/r --models /tmp/m` |
+| Training + PTQ/QAT ladder, pruning ladder, pre-training variants, scaling (GPU) | `notebooks/tracks.ipynb` on Colab/Kaggle, then `python -m edge_ai_compression.experiment_db.merge --src <downloaded>/results` |
+| Compressibility targets for every training run | `python -m edge_ai_compression.experiments.compress_runs --device cuda` |
+| Kernel study + backend latency (Apple M5 Pro, AC power) | `python run_kernel_study.py --config edge_ai_compression/configs/studies/kernel_sparsity_m5.yml` and `python launch_sweep.py --config edge_ai_compression/configs/sweeps/backend_latency_m5.yml` |
+| One experiment | `python run_experiment.py --config <config.yml>` |
 
-```bash
-pip install -e ".[kernels,export]" && scripts/build_kernels.sh   # C++ kernels + ONNX Runtime
-pip install -e ".[tf-mot]"   # TensorFlow + tf-keras + tf-mot (legacy/tflite/ scripts)
-pip install -e ".[viz]"      # matplotlib (plot_results.py)
-pip install -e ".[all]"      # everything above
-```
+The runs still to be launched are listed under "NEEDS ESHAAN" in [`PROGRESS.md`](PROGRESS.md).
 
-`requirements.txt` installs `-e .[dev]`; `environment.yml` creates a conda env
-with `-e .[all]`. `pyproject.toml` is the single source of truth for
-dependencies — the other two just point at it.
+## Architecture
 
----
+| Stage | Package | What it does | Guide |
+|---|---|---|---|
+| Training | `pretraining/` | SGD/AdamW trainer with log-spaced checkpoints; variants `standard`, `quant_noise`, `kurtosis`, `rigl`; compressibility signals (kurtosis, outlier ratios, Hessian trace, sharpness) logged to the DB | [pretraining](docs/pretraining.md) |
+| Quantization | `compression/quantization/` | RTN + min-max/percentile/MSE calibration, AdaRound, BRECQ, LSQ QAT, HAWQ-style mixed precision, SmoothQuant; simulated layers that lower to the kernels exactly | [quantization](docs/quantization.md) |
+| Pruning | `compression/pruning/` | unstructured, 2:4, channel pruning; masked fine-tuning or masked LoRA recovery | [pruning](docs/pruning.md) |
+| Inference | `csrc/`, `inference/` | C++ kernels (fp32, exact int8, int4 weight-only, 2:4, CSR), FX engine, backends (PyTorch, ONNX Runtime, engine modes), roofline | [inference](docs/inference.md) |
+| Benchmarking | `benchmarking/` | fresh-process timing, cold-start stages, peak memory, bootstrap CIs, Mann-Whitney comparisons, fingerprint | [benchmarking](docs/benchmarking.md) |
+| Experiment DB | `experiment_db/` | the only results output: experiments, kernel benchmarks, training runs, training signals, per-run artifacts; merge from remote runs | |
+| Analysis | `analysis/` | early predictability, signal ablations, scaling fits, latency proxies, Pareto frontiers, paper tables; each validated on synthetic data with planted answers | [analysis](docs/analysis.md) |
+| Write-up | `paper/`, `docs/blog.md` | workshop paper and blog post, with PENDING markers wherever results are missing | |
 
-## PyTorch research framework (`edge_ai_compression`)
+Models: ResNets `resnet{10,18,34}_w{0.25,0.5,1.0}_cifar` (plus `resnet18_cifar`), ViTs
+`vit_{t,s,m}_cifar`, torchvision ImageNet ResNet-18/50 for validation against the papers.
+Datasets: CIFAR-10/100, Tiny ImageNet, ImageNet (license-gated), `fake` (offline smoke).
 
-Run a compression experiment from a YAML config:
+Other entrypoints (all take `--help`):
+- `auto-compress`: constrained search over compression configs
+- `search_compression.py`: Pareto frontier from the DB
+- `train_surrogate.py`: RF/MLP/GP surrogates on DB rows
+- `analyze_failures.py`: per-run confusion/failure cases
+- `launch_sweep.py` / `resume_sweep.py`: resumable sweeps
 
-```bash
-# Fast smoke tests (synthetic data, offline):
-python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
-python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_benchmark.yml
+Old code (the standalone PyTorch CLI and the TensorFlow/TFLite scripts) is frozen in
+[`legacy/`](legacy/README.md).
 
-# Full runs (download + use the whole dataset — slower):
-python run_experiment.py --config edge_ai_compression/configs/experiments/baseline_eval.yml
-python run_experiment.py --config edge_ai_compression/configs/experiments/prune_then_eval.yml
-```
+## Engineering
 
-Two knobs keep runs cheap: `dataset: fake` (aliases `synthetic` / `debug` /
-`random`) generates random CIFAR‑shaped tensors with no network access, and
-`limit_samples: <N>` caps each split to its first N examples. Real datasets
-(`cifar10`, `cifar100`, `tiny_imagenet`) are unchanged — drop both knobs for a
-full experiment.
-
-Other entrypoints (all support `--help`):
-
-```bash
-auto-compress --device cpu --max-latency-ms 50 \
-  --max-size-mb 50 --min-accuracy 0.5 --budget 4     # constrained AutoML search (runs `budget` full experiments)
-python search_compression.py --objective pareto \
-  --results results/experiments.csv                   # Pareto frontier from logged runs
-python train_surrogate.py --results results/experiments.csv --out results/surrogates
-python analyze_failures.py --experiment-id <uuid>
-python plot_results.py                                # needs .[viz]
-python launch_sweep.py --config edge_ai_compression/configs/sweeps/full_compression_study.yml
-python resume_sweep.py --sweep-id full_compression_study
-python run_kernel_study.py --config edge_ai_compression/configs/studies/smoke_kernel_study.yml  # needs kernels
-```
-
-### What the framework implements
-
-| Area | Capability |
-|------|------------|
-| **Experiment DB** | The only results output, always on: one row per run in `<results_dir>/experiments.csv` / `.jsonl` (schema v2) plus `artifacts/{id}/` (config, metrics, fingerprint, `model.pt`, per‑process latency traces, confusion matrix, failure cases). |
-| **Benchmarking** | Latency and memory measured in fresh processes (default 5 × 1000 timed iterations after warmup); median of per‑process medians with bootstrap CI; cold‑start stages; peak RSS; hardware/software fingerprint per run. See [`docs/benchmarking.md`](docs/benchmarking.md). |
-| **Inference** | C++ kernels (fp32, exact int8, int4 weight-only, 2:4 and CSR sparse; NEON / AVX2 / AVX‑512) with nanobind bindings; an FX engine that runs CNNs on them; backends `torch_eager`, `onnxruntime`, `edge_{f32,int8,w4,sparse24,csr}`; kernel study + roofline analysis. See [`docs/inference.md`](docs/inference.md). |
-| **Pruning** | Global unstructured (`magnitude`) and `layerwise_adaptive` with `magnitude` / `gradient` / `activation` / `ablation` scorers. |
-| **Quantization** | Dynamic linear (PyTorch). |
-| **Distillation** | KD from a teacher checkpoint (temperature + alpha). |
-| **Compression order** | `compression_order` / `compression_order_tag` (e.g. `distill>prune>quantize`). |
-| **Multi‑objective** | Pareto frontier + NSGA‑II (`optimization/search/nsga2.py`). |
-| **Surrogates / policy** | RF/MLP/GP surrogates on the results CSV; constraint‑feasible row selection. |
-| **Diagnostics** | Confusion matrices, per‑class accuracy, ECE, NLL, failure cases. |
-| **Datasets** | `cifar10`, `cifar100`, `tiny_imagenet`, and `fake` (synthetic, offline) via `build_loaders()`. |
-
-Layout: `core`, `compression`, `optimization`, `benchmarking`, `inference`,
-`analysis`, `data`, `utils`, `experiment_db`, `surrogate`, `policy`, `theory`,
-`configs/`, `experiments/`, `auto_compress.py`.
-
----
-
-## Legacy code
-
-`legacy/` holds the old `src/model_compression/` PyTorch CLI (formerly `mc`)
-and the TensorFlow / Keras TFLite scripts that used to live at the repo root.
-It is not installed with the package and is kept for reference only; see
-[`legacy/README.md`](legacy/README.md) for how to run it.
-
----
-
-## Repository map
-
-```
-edge_ai_compression/     PyTorch research framework (models, data, compression, search, DB)
-run_experiment.py search_compression.py train_surrogate.py ...   root wrappers
-edge_ai_compression/configs/   experiment / dataset / search-space / sweep / study YAML
-csrc/                    C++ kernels (CMake + nanobind), built by scripts/build_kernels.sh
-tests/                   pytest suite (CPU, no network)
-legacy/                  frozen PyTorch CLI + TF/TFLite scripts (not installed)
-models/  data/  results/ generated artifacts (git-ignored)
-```
-
-Generated artifacts (`models/`, `data/`, dataset downloads, `results/artifacts`,
-sweeps, plots, virtualenvs, caches) are **git‑ignored** — the repo stays lean.
-
----
-
-## Development
-
-```bash
-ruff check .          # lint (also enforced in CI)
-ruff format .         # auto-format
-pytest -q             # tests
-```
-
-CI (`.github/workflows/ci.yml`) runs `ruff check .`, `ruff format --check .`,
-`pytest -q`, and the offline smoke experiments on Python 3.11.
+- `ruff check .`, `ruff format --check .`, `pytest -q`. CPU only, no network, with a `fake`
+  dataset smoke config for every module.
+- CI runs on Ubuntu (AVX2 kernel paths) and macOS arm64 (NEON paths). It builds the kernels,
+  runs every smoke config, runs `./reproduce.sh` on the smoke DB, and compiles the paper.
+  Optionally it also runs the AVX-512 paths under Intel SDE (`ENABLE_SDE` repository variable).
+- Design decisions and the reasoning behind them: [`docs/DECISIONS.md`](docs/DECISIONS.md).
+  Interview-style Q&A per phase: [`docs/INTERVIEW_PREP.md`](docs/INTERVIEW_PREP.md).
 
 ## License
 
-MIT — see `LICENSE` if present.
-
-## Acknowledgements
-
-PyTorch & torchvision; TensorFlow / Keras, the TensorFlow Model Optimization
-Toolkit (TF‑MOT), and TFLite for the deployment‑oriented quantization path.
+MIT.
