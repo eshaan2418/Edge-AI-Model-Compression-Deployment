@@ -1,0 +1,31 @@
+# Offline smoke test of the benchmarking harness alone: no compression, so the
+# run benchmarks the (randomly initialized) baseline model. 3 fresh processes
+# give a bootstrap CI on the median latency. Runs in seconds on CPU.
+model: resnet18_cifar
+dataset: fake
+data_dir: data
+batch_size: 32
+num_workers: 0
+device: cpu
+seed: 42
+limit_samples: 32
+checkpoint_out: models/smoke_benchmark.pt
+compression_order_tag: baseline
+compression:
+  pruning:
+    enabled: false
+  quantization:
+    enabled: false
+  distillation:
+    enabled: false
+benchmark:
+  batch_size: 1
+  num_threads: 1
+  warmup_iters: 5
+  min_warmup_s: 0.0
+  iters: 20
+  process_repeats: 3
+  strict_environment: false
+experiment_db:
+  results_dir: results/smoke
+  diagnostics_max_batches: 1

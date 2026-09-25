@@ -64,3 +64,17 @@ decided, alternatives considered, and why.
 - **Alternatives:** `multiprocessing` spawn; in-process timing.
 - **Why:** multiprocessing's spawn re-imports the parent's `__main__` module (and therefore torch) before the target runs, which contaminates cold-start stage timings. A plain subprocess gives a real cold start: spawn → interpreter → `import torch` → load → first inference.
 - **Assumption:** `time.monotonic_ns()` is system-wide on macOS and Linux, so parent and child timestamps are comparable. Tested.
+
+### D1.11 No separate benchmark CLI
+- **Decision:** dropped the planned `benchmarking/cli.py`. `run_experiment.py` with all compression disabled (`smoke_benchmark.yml`) benchmarks a model and logs it to the DB.
+- **Why:** a second entrypoint that benchmarks a model would be a parallel pipeline. Benchmarking exported artifacts (ONNX, C++ runtime) is designed in Phase 2 on top of the same worker.
+
+### D1.12 `compression_order` records only the stages that ran
+- **Why:** the column used to record the configured order (default `distill>prune>quantize`) even when only pruning was enabled, so DB rows mislabeled what was done. Unknown stage names now raise instead of being skipped.
+
+### D1.13 Missing `checkpoint_in` is an error
+- **Why:** the runner silently fell back to random weights when the checkpoint path didn't exist.
+
+### D1.14 Quantized engine selected explicitly
+- **Finding:** on torch 2.14 / macOS arm64 the quantized engine defaults to `none`, so the framework's dynamic quantization failed with `NoQEngine` on the primary platform. `utils/quant_engine.py` selects x86 > fbgemm > qnnpack.
+- **Also noted:** torch 2.14 warns that quantized tensor dtypes (`qint8`, ...) are deprecated and will be removed. This shapes Phase 3: build quantization on simulated (fake-quant) float ops plus our own integer kernels (Phase 2), not on `torch.ao` quantized modules.

@@ -23,5 +23,7 @@ jobs:
         run: ruff format --check .
       - name: Pytest
         run: pytest -q
-      - name: Smoke experiment (offline, synthetic data)
-        run: python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
+      - name: Smoke experiments (offline, synthetic data)
+        run: |
+          python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
+          python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_benchmark.yml

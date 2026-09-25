@@ -13,7 +13,7 @@ from edge_ai_compression.analysis.diagnostics import full_diagnostic_report
 from edge_ai_compression.benchmarking.evaluator import Evaluator, accuracy_on_loader
 from edge_ai_compression.core.compression_orders import format_order
 from edge_ai_compression.core.experiment import ExperimentConfig, ExperimentResult
-from edge_ai_compression.core.pipeline import CompressionPipeline
+from edge_ai_compression.core.pipeline import CompressionPipeline, enabled_stage_names
 from edge_ai_compression.core.registry import ModelRegistry
 from edge_ai_compression.data.loaders import build_loaders
 from edge_ai_compression.experiment_db.record import record_from_run
@@ -66,6 +66,7 @@ class ExperimentRunner:
         baseline_acc, _ = accuracy_on_loader(model, test_loader, cfg.device)
 
         pipeline = CompressionPipeline(cfg.compression, order=cfg.compression_order)
+        applied_order = format_order(enabled_stage_names(cfg.compression_order, cfg.compression))
         work = ModelRegistry.create(cfg.model, num_classes=cfg.num_classes).to(cfg.device)
         work.load_state_dict({k: v.to(cfg.device) for k, v in baseline_sd.items()})
 
@@ -106,7 +107,7 @@ class ExperimentRunner:
         }
         metrics: dict[str, Any] = {
             "experiment_id": exp_id,
-            "compression_order": format_order(cfg.compression_order),
+            "compression_order": applied_order,
             "hardware_profile": cfg.hardware_profile,
             "baseline_accuracy": baseline_acc,
             "benchmark": report.to_dict(),
@@ -132,7 +133,7 @@ class ExperimentRunner:
             dataset=cfg.dataset,
             num_params=nparams,
             flops=flops,
-            compression_order=format_order(cfg.compression_order),
+            compression_order=applied_order,
             pruning_type=pruning_type,
             pruning_sparsity=pruning_sparsity,
             quantization_type=cfg.compression.quantization.mode

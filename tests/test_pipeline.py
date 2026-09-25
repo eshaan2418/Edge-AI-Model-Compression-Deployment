@@ -13,3 +13,10 @@ def test_compression_pipeline_prune_only():
     pipe = CompressionPipeline(cfg)
     out = pipe.run(m, None, data_dir="data", batch_size=4, device="cpu")
     assert isinstance(out, torch.nn.Module)
+
+
+def test_unknown_stage_name_raises():
+    import pytest
+
+    with pytest.raises(ValueError, match="unknown compression stages"):
+        CompressionPipeline(CompressionConfig(), order=["prnue"])
