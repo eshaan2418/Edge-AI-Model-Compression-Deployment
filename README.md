@@ -88,7 +88,7 @@ python search_compression.py --objective pareto \
 python train_surrogate.py --results results/experiments.csv --out results/surrogates
 python analyze_failures.py --experiment-id <uuid>
 python plot_results.py                                # needs .[viz]
-python launch_sweep.py --config configs/sweeps/full_compression_study.yml
+python launch_sweep.py --config edge_ai_compression/configs/sweeps/full_compression_study.yml
 python resume_sweep.py --sweep-id full_compression_study
 ```
 
@@ -126,8 +126,7 @@ It is not installed with the package and is kept for reference only; see
 ```
 edge_ai_compression/     PyTorch research framework (models, data, compression, search, DB)
 run_experiment.py search_compression.py train_surrogate.py ...   root wrappers
-configs/sweeps/          sweep definitions for launch_sweep.py
-edge_ai_compression/configs/   experiment / dataset / hardware / search-space YAML
+edge_ai_compression/configs/   experiment / dataset / hardware / search-space / sweep YAML
 tests/                   pytest suite (CPU, no network)
 legacy/                  frozen PyTorch CLI + TF/TFLite scripts (not installed)
 models/  data/  results/ generated artifacts (git-ignored)
