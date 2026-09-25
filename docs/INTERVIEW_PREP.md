@@ -71,3 +71,31 @@ Every backend goes through the same path:
 - Cold start includes loading and packing weights, as it would for a real runtime.
 
 Two bugs this caught before any results were produced: the dynamo ONNX exporter writing weights to a side file (so size looked like 0.1 MB), and Linux `ru_maxrss` inheriting the parent's peak across exec.
+
+---
+
+## Phase 3: PTQ / QAT ladder
+
+**1. Why build quantization on fake-quant simulation instead of PyTorch's quantized modules?**
+Three reasons:
+- On the primary platform, torch 2.14's eager quantization didn't even run (no quantized engine), and torch has deprecated its quantized dtypes.
+- Simulation is differentiable, which AdaRound, BRECQ and LSQ all need.
+- Simulation is backend-independent: the deployed model is the C++ engine, not torch.
+
+The risk is that simulation and deployment silently disagree. So every lowered layer is tested against its simulation (1e-5 relative, identical inputs), and accuracy is always measured with the backend that's timed.
+
+**2. Your engine and simulation disagree by about 1% at the logits. Isn't that a bug?**
+It was 1.6% at first, and part of it was a bug: the kernel multiplied by 1/scale while the simulation divides, which flips rounding ties. After that fix, the rest is intrinsic. The engine accumulates exactly in int32 and rescales once; the simulation accumulates dequantized products in fp32. They differ around 1e-7, and a value sitting exactly on a rounding boundary at the next layer can round differently. Those one-step flips compound through 20 layers of a random-weight network. Any two correct int8 implementations disagree this way. The right contract is per-layer exactness plus end-to-end agreement, and that's what I test.
+
+**3. What does AdaRound optimize, and why does it beat round-to-nearest?**
+Nearest rounding minimizes each weight's own error but ignores how errors combine in the layer output. AdaRound learns a rounding direction per weight so that the layer's output on real data, ‖WX − W̃X‖², is minimized. It relaxes the binary choice to a rectified sigmoid, and an annealed regularizer (β from 20 to 2) pushes it back to 0/1. A second-order Taylor expansion shows the output error is what drives the task loss, so correlated rounding choices can cancel each other. My unit test reproduces the mechanism: at 3 bits, AdaRound's reconstruction error is lower than RTN's on the same layer.
+
+**4. How does HAWQ decide which layers get 4 bits?**
+- **Sensitivity:** each layer gets Ω(b) = tr(H)/n · ‖Q_b(W) − W‖², the average loss curvature for that layer times the size of the quantization perturbation.
+- **Curvature:** Hutchinson's estimator, tr(H) = E[vᵀHv] with Rademacher v. One double-backprop Hessian-vector product gives the trace of every layer's diagonal block at once.
+- **Allocation:** an exact ILP (scipy milp) picks bits per layer to minimize total Ω under an average-bit budget, with first and last layers pinned to 8.
+
+Caveats: the metric treats layers independently (no cross-layer interaction terms), and the trace is taken at the full-precision weights.
+
+**5. Why would SmoothQuant fail to help on your ViTs, and how would you know?**
+SmoothQuant moves per-channel activation scale into the weights. That only helps if a few activation channels are much larger than the rest, so per-tensor activation scales waste resolution. Dettmers et al. saw systematic outlier features emerge around the billion-parameter scale, and a small CIFAR ViT may have none. So I measure first: `outlier_stats` reports max/median per-channel activation maxima at each LayerNorm-fed linear. If the ratios are near 1–10, I expect SmoothQuant ≈ RTN and report that as a negative result. A test with an injected outlier channel confirms the method works when the precondition holds.

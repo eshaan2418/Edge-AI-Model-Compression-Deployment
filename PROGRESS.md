@@ -30,21 +30,19 @@ Resume point for autonomous work. Updated after every commit.
 - Research configs ready, results PENDING (need AC power): `studies/kernel_sparsity_m5.yml`,
   `sweeps/backend_latency_m5.yml`. Docs: docs/inference.md.
 
-### Phase 3 (PTQ/QAT ladder) in progress, branch `phase3-ptq` (pushed regularly)
-Done:
-- `pretraining/` trainer (log-spaced checkpoints, training_runs.csv) + train_model.py; configs
-  train/smoke_train.yml, train/resnet18_cifar10.yml.
-- `compression/quantization/`: quantizer (grids, scales, observers), modules (QuantConv2d/Linear,
-  fold_bn, quantize_model with first/last + per-layer bits), calibration, ptq.run_quantization,
-  reconstruction (AdaRound layer / BRECQ block, optional Fisher), qat (LSQ), hawq (ILP) +
-  analysis/hessian.py (Hutchinson). Methods: rtn, adaround, brecq, qat, hawq.
-- Engine `quant` mode / backend `edge_quant`: exact per-layer lowering (D3.6). torch.ao removed.
+### Phase 3 (PTQ/QAT ladder): COMPLETE, pushed on `phase3-ptq`
+- Trainer (`pretraining/`, SGD|AdamW, log-spaced checkpoints, export_path, training_runs.csv).
+- Ladder: rtn (+min-max/percentile/MSE calibration), adaround, brecq (+Fisher), qat (LSQ), hawq
+  (Hutchinson + ILP), smoothquant (+ outlier_stats); ViT t/s/m; ImageNet loader + torchvision
+  pretrained models for paper validation.
+- Engine `edge_quant`: per-layer exact lowering (D3.6); torch.ao removed (D3.5).
+- Resumable grid sweeps (`axes:`), dotted `--set` overrides, DB merge, `run_phase3` (smoke-tested),
+  `notebooks/phase3_ladder.ipynb`. Docs: docs/quantization.md.
+- Results PENDING (heavy runs, see NEEDS ESHAAN 4-6).
 
-Next:
-1. ViT models (3 sizes) + SmoothQuant (+ outlier measurement first).
-2. Ladder configs (CIFAR-10 ResNet-18 from trained checkpoint; ViT) + sweep; Colab/Kaggle notebook
-   for baseline training + ladder; ImageNet validation config (D3.3).
-3. Docs (docs/quantization.md), INTERVIEW_PREP Phase 3, push, CI green.
+### Next: Phase 4 (pruning + recovery), branch `phase4-pruning` stacked on `phase3-ptq`
+Plan to write into DECISIONS: unstructured (existing), 2:4 structured, channel pruning, LoRA recovery
+fine-tuning; lower to engine (sparse24/csr, channel-pruned dense); connect to Phase 2 sparsity study.
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
@@ -57,6 +55,10 @@ Next:
 - Kernels are single-threaded (D2.2): compare against torch/ORT at 1 thread.
 
 ## NEEDS ESHAAN
+0. **BLOCKER (2026-09-25): git commit signing / SSH push via 1Password fails**
+   (`1Password: failed to fill whole buffer`, `communication with agent failed`). Unlock 1Password
+   (or approve its prompt), then the pending Phase 3 docs commit can be created and pushed.
+   Signing was not disabled; that is your call.
 1. **Open the Phase 0 PR.** `gh` token can't create PRs. Run `! gh auth login -h github.com -w`, then:
    `gh pr create --base main --head consolidate --title "Consolidate legacy code into legacy/"`.
    Later phase PRs stack: `phase1-benchmarking` → base `consolidate`, and so on.
@@ -72,3 +74,11 @@ Next:
    python -m edge_ai_compression.analysis.kernel_study --results results --study kernel_sparsity_m5
    ```
    Results land in `results/` (experiment DB). The strict environment check refuses to run on battery.
+4. **Phase 3 ResNet-18 ladder (GPU, Colab/Kaggle):** open `notebooks/phase3_ladder.ipynb`, run all
+   cells for the resnet18 track (trains 3 seeds x 60 epochs, then 36 ladder runs). Or locally with
+   the M5 GPU: `python -m edge_ai_compression.experiments.run_phase3 --track resnet18 --device mps`.
+   Download `phase3_results.zip` and merge: `python -m edge_ai_compression.experiment_db.merge --src <dir>/results`.
+5. **Phase 3 ViT track:** same notebook, vit_s track (3 seeds x 200 epochs + 21 runs).
+6. **(Optional) ImageNet validation vs the papers:** needs ImageNet-1k (license-gated) in
+   `data/imagenet/{train,val}` ImageFolder layout, then
+   `python launch_sweep.py --config edge_ai_compression/configs/sweeps/ptq_validation_imagenet.yml --set device=cuda`.
