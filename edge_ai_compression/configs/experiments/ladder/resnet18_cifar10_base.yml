@@ -1,0 +1,36 @@
+# Base for the ResNet-18 / CIFAR-10 PTQ/QAT ladder (sweeps/ptq_ladder_resnet18_cifar10.yml).
+# Every variant quantizes the same trained checkpoint and runs on the C++ engine
+# (edge_quant), so accuracy and latency come from the deployed integer arithmetic.
+model: resnet18_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 256
+num_workers: 4
+device: cpu            # quantization/reconstruction device; --device cuda on Colab via the sweep
+seed: 0
+checkpoint_in: models/resnet18_cifar10_seed0.pt
+checkpoint_out: models/ladder_last.pt
+compression_order_tag: quantize
+compression:
+  pruning: {enabled: false}
+  distillation: {enabled: false}
+  quantization:
+    enabled: true
+    method: rtn
+    weight_bits: 8
+    act_bits: 8
+    granularity: per_channel
+    first_last_bits: 8
+    calibration: {method: minmax, num_samples: 1024, percentile: 99.99}
+benchmark:
+  backend: edge_quant
+  batch_size: 1
+  num_threads: 1
+  warmup_iters: 20
+  min_warmup_s: 0.5
+  iters: 200
+  process_repeats: 5
+  strict_environment: true
+experiment_db:
+  results_dir: results
+  diagnostics_max_batches: 40

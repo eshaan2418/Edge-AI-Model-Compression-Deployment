@@ -60,6 +60,14 @@ class QuantizationSection:
     )
     options: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        from edge_ai_compression.compression.quantization.quantizer import WeightSpec, qmax
+
+        # Validate the weight/activation spec at config load, not mid-run.
+        WeightSpec(self.weight_bits, self.granularity, self.group_size, self.weight_method)
+        if self.act_bits is not None:
+            qmax(self.act_bits)
+
     @property
     def tag(self) -> str:
         act = f"a{self.act_bits}" if self.act_bits else "afp"
@@ -183,6 +191,8 @@ def dataset_num_classes(name: str) -> int:
         return 100
     if n in ("tiny_imagenet", "tiny-imagenet-200"):
         return 200
+    if n == "imagenet":
+        return 1000
     return 10
 
 

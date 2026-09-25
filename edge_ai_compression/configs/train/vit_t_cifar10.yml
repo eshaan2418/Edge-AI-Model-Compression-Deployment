@@ -1,0 +1,25 @@
+# vit_t_cifar on CIFAR-10 (ViT track: SmoothQuant in Phase 3, scaling curves in Phase 5).
+# Recipe: AdamW (beta1 0.9), lr 1e-3 cosine with 10 warmup epochs, wd 0.05 (not on
+# LayerNorm/bias), label smoothing 0.1, batch 256, crop+flip. No RandAugment/mixup,
+# so accuracy is below heavily-augmented ViT-on-CIFAR recipes; the ladder compares
+# methods on the same trained model, so absolute accuracy is secondary.
+model: vit_t_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 256
+num_workers: 4
+device: cuda
+seed: 0
+optimizer: adamw
+lr: 0.001
+momentum: 0.9
+weight_decay: 0.05
+label_smoothing: 0.1
+epochs: 200
+warmup_epochs: 10
+schedule: cosine
+num_checkpoints: 12
+checkpoint_dir: models/checkpoints
+export_path: models/vit_t_cifar10_seed0.pt
+results_dir: results
+log_every_steps: 100

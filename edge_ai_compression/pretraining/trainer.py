@@ -76,15 +76,17 @@ def train_model(
     for name, p in model.named_parameters():
         exempt = p.ndim <= 1 or name.endswith((".bias", "_scale"))  # BN, biases, quant scales
         (no_decay if exempt else decay).append(p)
-    opt = torch.optim.SGD(
-        [
-            {"params": decay, "weight_decay": cfg.weight_decay},
-            {"params": no_decay, "weight_decay": 0.0},
-        ],
-        lr=cfg.lr,
-        momentum=cfg.momentum,
-        nesterov=cfg.nesterov and cfg.momentum > 0,
-    )
+    groups = [
+        {"params": decay, "weight_decay": cfg.weight_decay},
+        {"params": no_decay, "weight_decay": 0.0},
+    ]
+    opt: torch.optim.Optimizer
+    if cfg.optimizer == "adamw":
+        opt = torch.optim.AdamW(groups, lr=cfg.lr, betas=(cfg.momentum, 0.999))
+    else:
+        opt = torch.optim.SGD(
+            groups, lr=cfg.lr, momentum=cfg.momentum, nesterov=cfg.nesterov and cfg.momentum > 0
+        )
     criterion = nn.CrossEntropyLoss(label_smoothing=cfg.label_smoothing)
     history: list[dict[str, float]] = []
     step = 0

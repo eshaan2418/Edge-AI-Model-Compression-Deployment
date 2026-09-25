@@ -1,0 +1,15 @@
+# SmoothQuant on ViT-S / CIFAR-10: 3 seeds x 7 rungs. Check outlier_stats first
+# (docs/quantization.md): with no outlier channels, SmoothQuant should be ~= RTN.
+sweep_id: ptq_ladder_vit_s_cifar10
+base_config: edge_ai_compression/configs/experiments/ladder/vit_s_cifar10_base.yml
+axes:
+  - - {seed: 0, checkpoint_in: models/vit_s_cifar10_seed0.pt}
+    - {seed: 1, checkpoint_in: models/vit_s_cifar10_seed1.pt}
+    - {seed: 2, checkpoint_in: models/vit_s_cifar10_seed2.pt}
+  - - {compression_order_tag: baseline, compression: {quantization: {enabled: false}}}
+    - {compression: {quantization: {method: rtn, calibration: {method: minmax}}}}
+    - {compression: {quantization: {method: rtn, calibration: {method: percentile}}}}
+    - {compression: {quantization: {method: rtn, granularity: per_tensor}}}
+    - {compression: {quantization: {method: smoothquant, smoothquant: {alpha: 0.5}}}}
+    - {compression: {quantization: {method: smoothquant, smoothquant: {alpha: 0.75}}}}
+    - {compression: {quantization: {method: rtn, weight_bits: 4}}}

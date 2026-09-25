@@ -25,11 +25,27 @@ class ModelRegistry:
         return cls._builders[name](num_classes=num_classes, **kwargs)
 
 
+def _torchvision_imagenet(arch: str):
+    """Pretrained torchvision ImageNet model (downloads weights on first use)."""
+
+    def build(num_classes: int = 1000) -> nn.Module:
+        import torchvision
+
+        if num_classes != 1000:
+            raise ValueError(f"{arch}_imagenet_tv is a 1000-class ImageNet model")
+        weights = torchvision.models.get_model_weights(arch).IMAGENET1K_V1
+        return torchvision.models.get_model(arch, weights=weights)
+
+    return build
+
+
 def _default_register() -> None:
     ModelRegistry.register("resnet18_cifar", resnet18_cifar)
     ModelRegistry.register("mobilenet_v2_cifar", mobilenet_v2_cifar)
     ModelRegistry.register("efficientnet_b0_cifar", efficientnet_b0_cifar)
     ModelRegistry.register("small_cnn_student", small_cnn_student)
+    for arch in ("resnet18", "resnet50"):
+        ModelRegistry.register(f"{arch}_imagenet_tv", _torchvision_imagenet(arch))
     for size in VIT_SIZES:
         ModelRegistry.register(size, lambda num_classes=10, _s=size: vit_cifar(_s, num_classes))
 

@@ -1,0 +1,13 @@
+# Compare against: Nagel et al. 2020 (AdaRound) ImageNet W4A32 tables and Li et al.
+# 2021 (BRECQ) W4A32 tables for torchvision ResNet-18/50. Iterations as in the
+# papers (AdaRound 10k per layer, BRECQ 20k per block).
+sweep_id: ptq_validation_imagenet
+base_config: edge_ai_compression/configs/experiments/ladder/imagenet_base.yml
+axes:
+  - - {model: resnet18_imagenet_tv}
+    - {model: resnet50_imagenet_tv}
+  - - {compression_order_tag: baseline, compression: {quantization: {enabled: false}}}
+    - {compression: {quantization: {method: rtn}}}
+    - {compression: {quantization: {method: adaround, adaround: {iters: 10000, num_samples: 1024}}}}
+    - {compression: {quantization: {method: brecq, brecq: {iters: 20000, num_samples: 1024, fisher: true}}}}
+    - {compression: {quantization: {method: rtn, weight_bits: 8, act_bits: 8, calibration: {method: percentile}}}}

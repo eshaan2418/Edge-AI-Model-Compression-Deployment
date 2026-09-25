@@ -1,0 +1,35 @@
+# Base for the ViT-S / CIFAR-10 ladder (SmoothQuant track). The C++ engine does not
+# lower ViTs (D3.8), so accuracy is simulated (torch_eager) and the latency columns
+# describe the fake-quant simulation, not a deployed kernel: ignore them here.
+model: vit_s_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 256
+num_workers: 4
+device: cpu
+seed: 0
+checkpoint_in: models/vit_s_cifar10_seed0.pt
+checkpoint_out: models/ladder_vit_last.pt
+compression_order_tag: quantize
+compression:
+  pruning: {enabled: false}
+  distillation: {enabled: false}
+  quantization:
+    enabled: true
+    method: rtn
+    weight_bits: 8
+    act_bits: 8
+    granularity: per_channel
+    calibration: {method: minmax, num_samples: 512}
+benchmark:
+  backend: torch_eager
+  batch_size: 1
+  num_threads: 4
+  warmup_iters: 5
+  min_warmup_s: 0.0
+  iters: 20
+  process_repeats: 1
+  strict_environment: false
+experiment_db:
+  results_dir: results
+  diagnostics_max_batches: 40

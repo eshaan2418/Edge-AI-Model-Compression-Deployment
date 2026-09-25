@@ -15,5 +15,6 @@ warmup_epochs: 1
 schedule: cosine
 num_checkpoints: 12
 checkpoint_dir: models/checkpoints
+export_path: models/resnet18_cifar10_seed0.pt  # use --set seed=N --set export_path=...
 results_dir: results
 log_every_steps: 100

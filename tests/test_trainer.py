@@ -50,3 +50,18 @@ def test_smoke_training_logs_run_and_checkpoints(tmp_path):
         row = next(csv.DictReader(f))
     assert row["run_id"] == result.run_id and row["steps"] == "8"
     assert (result.run_dir / "history.jsonl").read_text().count("\n") == 4
+
+
+def test_adamw_option_and_overrides():
+    from edge_ai_compression.experiments.train_model import parse_overrides
+
+    assert TrainConfig.from_dict({"optimizer": "adamw"}).optimizer == "adamw"
+    with pytest.raises(ValueError, match="optimizer"):
+        TrainConfig.from_dict({"optimizer": "lion"})
+    assert parse_overrides(["seed=2", "export_path=models/x.pt", "lr=0.001"]) == {
+        "seed": 2,
+        "export_path": "models/x.pt",
+        "lr": 1e-3,
+    }
+    with pytest.raises(ValueError):
+        parse_overrides(["seed"])

@@ -7,11 +7,13 @@ from typing import Any
 
 VARIANTS = ("standard",)
 SCHEDULES = ("cosine", "constant")
+OPTIMIZERS = ("sgd", "adamw")
 
 
 @dataclass(frozen=True)
 class TrainConfig:
-    """Supervised training with SGD + momentum, linear warmup, then cosine or constant LR.
+    """Supervised training (SGD + nesterov momentum, or AdamW), linear warmup, then
+    cosine or constant LR.
 
     ``num_checkpoints`` checkpoints are saved at log-spaced steps (always
     including the final step) so downstream compression can start from any
@@ -29,6 +31,7 @@ class TrainConfig:
     variant: str = "standard"
     epochs: int = 1
     max_steps: int | None = None
+    optimizer: str = "sgd"
     lr: float = 0.1
     momentum: float = 0.9
     nesterov: bool = True
@@ -45,6 +48,8 @@ class TrainConfig:
     def __post_init__(self) -> None:
         if self.variant not in VARIANTS:
             raise ValueError(f"unknown variant '{self.variant}'; expected {VARIANTS}")
+        if self.optimizer not in OPTIMIZERS:
+            raise ValueError(f"unknown optimizer '{self.optimizer}'; expected {OPTIMIZERS}")
         if self.schedule not in SCHEDULES:
             raise ValueError(f"unknown schedule '{self.schedule}'; expected {SCHEDULES}")
         for name in ("batch_size", "epochs", "num_checkpoints", "log_every_steps"):
