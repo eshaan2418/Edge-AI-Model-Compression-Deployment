@@ -1,0 +1,22 @@
+# Base for the Phase 5 ResNet training sweeps (compression-aware variants,
+# scaling, training length). Signals are logged at init, at every log-spaced
+# checkpoint, and every 500 steps; they are the Phase 6 surrogate features.
+model: resnet18_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 128
+num_workers: 4
+device: cuda
+seed: 0
+variant: standard
+epochs: 60
+lr: 0.1
+warmup_epochs: 1
+schedule: cosine
+num_checkpoints: 12
+checkpoint_dir: models/checkpoints
+export_path: models/pretrain/{model}_{variant}_e{epochs}_s{seed}.pt
+results_dir: results
+log_every_steps: 100
+signals: {probe_samples: 256, hessian: true, hessian_iters: 20, sharpness: true, rho: 0.05}
+signal_every_steps: 500

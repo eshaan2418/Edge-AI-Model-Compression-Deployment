@@ -24,7 +24,13 @@ TRACKS = {
     "resnet18_ptq": ("train/resnet18_cifar10.yml", "sweeps/ptq_ladder_resnet18_cifar10.yml"),
     "vit_s_ptq": ("train/vit_s_cifar10.yml", "sweeps/ptq_ladder_vit_s_cifar10.yml"),
     "resnet18_prune": ("train/resnet18_cifar10.yml", "sweeps/prune_ladder_resnet18_cifar10.yml"),
+    # Phase 5 training-only tracks (the sweep itself trains; no baseline step)
+    "pretrain_variants": (None, "sweeps/pretrain_variants_resnet18_cifar10.yml"),
+    "pretrain_scaling": (None, "sweeps/pretrain_scaling_cifar10.yml"),
+    "pretrain_length": (None, "sweeps/pretrain_length_cifar10.yml"),
+    "pretrain_vit": (None, "sweeps/pretrain_vit_sizes_cifar10.yml"),
 }
+SMOKE_SIGNALS = {"signals": {"probe_samples": 8, "hessian_iters": 2}, "signal_every_steps": None}
 SMOKE_TRAIN = {
     "dataset": "fake",
     "limit_samples": 32,
@@ -71,6 +77,36 @@ def _smoke_sweep(spec: dict[str, Any]) -> dict[str, Any]:
     return {**spec, "axes": [seeds, [_shrink(r) for r in rungs[:2] + trains[:1]]]}
 
 
+def _remap_models(value: Any, models: Path) -> Any:
+    """Point "models/..." paths (incl. templates) at ``models``."""
+    if isinstance(value, str) and value.startswith("models/"):
+        return str(models / value.removeprefix("models/"))
+    return value
+
+
+def run_train_sweep(
+    sweep_path: str, seeds: list[int], device: str, results: Path, models: Path, smoke: bool
+) -> None:
+    spec = load_yaml(CONFIGS / sweep_path)
+    axes = [list(axis) for axis in spec["axes"]]
+    axes[0] = [a for a in axes[0] if a.get("seed") in seeds]
+    for axis in axes:
+        for entry in axis:
+            if "export_path" in entry:
+                entry["export_path"] = _remap_models(entry["export_path"], models)
+    if smoke:  # first entry of every axis, first two of the last
+        axes = [axis[:1] for axis in axes[:-1]] + [axes[-1][:2]]
+    base = load_yaml(Path(spec["base_config"]))
+    overrides = {
+        "device": device,
+        "results_dir": str(results),
+        "checkpoint_dir": str(models / "checkpoints"),
+        "export_path": _remap_models(base["export_path"], models),
+        **({**SMOKE_TRAIN, **SMOKE_SIGNALS} if smoke else {}),
+    }
+    run_sweep({**spec, "axes": axes}, results / "sweeps", overrides)
+
+
 def run(
     track: str,
     seeds: list[int],
@@ -81,6 +117,9 @@ def run(
     skip_train: bool,
 ) -> None:
     train_path, sweep_path = TRACKS[track]
+    if train_path is None:
+        run_train_sweep(sweep_path, seeds, device, results, models, smoke)
+        return
     model_prefix = train_path.split("/")[1].removesuffix(".yml")
     for seed in seeds:
         if skip_train or (models / f"{model_prefix}_seed{seed}.pt").is_file():

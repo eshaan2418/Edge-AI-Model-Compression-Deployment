@@ -1,0 +1,7 @@
+# Phase 5 ViT sizes: vit_t / vit_s / vit_m x 3 seeds = 9 runs (200 epochs each).
+kind: train
+sweep_id: pretrain_vit_sizes_cifar10
+base_config: edge_ai_compression/configs/train/pretrain_vit_base.yml
+axes:
+  - [{seed: 0}, {seed: 1}, {seed: 2}]
+  - [{model: vit_t_cifar}, {model: vit_s_cifar}, {model: vit_m_cifar}]

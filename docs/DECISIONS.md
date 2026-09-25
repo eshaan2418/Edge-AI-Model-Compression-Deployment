@@ -218,3 +218,9 @@ Rows go to `training_signals.csv` (run id, step, scalar summaries), with per-lay
 
 ### D5.2 Quant-Noise via parametrization
 - Implemented with `torch.nn.utils.parametrize` (w + mask ⊙ (Q(w) − w).detach()), removed at the end of training with the original weights kept, so checkpoints are plain float models.
+
+### D5.3 Experiment configs reject unknown top-level keys
+- Every other section was already strict, but `ExperimentConfig` ignored unknown top-level keys. A typo such as `limit_sample` silently ran the full dataset, and a training sweep parsed as an experiment config passed the config tests. Now it raises.
+
+### D5.4 Training sweeps (`kind: train`) with path templates
+- A grid of seeds × variants needs distinct checkpoint paths. Top-level string values are formatted with the merged config (`models/pretrain/{model}_{variant}_e{epochs}_s{seed}.pt`), and the config test asserts no two runs in a training sweep share an export path.

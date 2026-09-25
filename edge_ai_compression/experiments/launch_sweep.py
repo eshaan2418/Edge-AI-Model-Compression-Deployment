@@ -2,13 +2,15 @@
 
 Sweep YAML:
   sweep_id: name (state file: results/sweeps/<sweep_id>_state.jsonl)
-  base_config: experiment YAML every variant is merged into
+  kind: experiment (default; ExperimentRunner) | train (run_training on a TrainConfig)
+  base_config: experiment (or training) YAML every variant is merged into
   variants: [ {override...}, ... ]            # explicit list, and/or
   axes: [ [ {override}, ... ], [ ... ] ]      # cartesian product of override lists
 
-Each variant is deep-merged into the base config. Variants already recorded in
-the state file are skipped, so re-running the same command resumes an
-interrupted sweep.
+Each variant is deep-merged into the base config; top-level string values may
+use {key} templates filled from the merged config (e.g. "models/{model}_s{seed}.pt").
+Variants already recorded in the state file are skipped, so re-running the same
+command resumes an interrupted sweep.
 """
 
 from __future__ import annotations
@@ -23,6 +25,8 @@ import yaml
 
 from edge_ai_compression.core.experiment import ExperimentConfig
 from edge_ai_compression.core.runner import ExperimentRunner
+from edge_ai_compression.pretraining.config import TrainConfig
+from edge_ai_compression.pretraining.trainer import run_training
 from edge_ai_compression.utils.config_loader import merge_dict
 from edge_ai_compression.utils.overrides import apply_overrides, parse_overrides
 
@@ -55,6 +59,9 @@ def run_sweep(
     base = yaml.safe_load(Path(spec["base_config"]).read_text(encoding="utf-8"))
     base = apply_overrides(base, base_overrides or {})
     sweep_id = str(spec.get("sweep_id", "sweep"))
+    kind = str(spec.get("kind", "experiment"))
+    if kind not in ("experiment", "train"):
+        raise ValueError("sweep kind must be 'experiment' or 'train'")
     variants = expand_variants(spec)
     state_path = state_dir / f"{sweep_id}_state.jsonl"
     state_path.parent.mkdir(parents=True, exist_ok=True)
@@ -67,18 +74,34 @@ def run_sweep(
         if variant_key(variant) in done:
             print(f"[{i}/{len(variants)}] skip (done): {variant}")
             continue
-        cfg = ExperimentConfig.from_dict(merge_dict(base, variant))
-        result = ExperimentRunner(cfg).run()
-        with open(state_path, "a", encoding="utf-8") as f:
-            f.write(
-                json.dumps(
-                    {"variant": variant, "result": result.to_dict(), "sweep_id": sweep_id},
-                    default=str,
-                )
-                + "\n"
+        merged = fill_templates(merge_dict(base, variant))
+        if kind == "train":
+            train = run_training(TrainConfig.from_dict(merged))
+            result, run_id = (
+                {
+                    "run_id": train.run_id,
+                    "test_accuracy": train.test_accuracy,
+                    "final_checkpoint": train.checkpoints[-1],
+                },
+                train.run_id,
             )
-        print(f"[{i}/{len(variants)}] done: {variant} -> {result.extras['experiment_id']}")
+        else:
+            exp = ExperimentRunner(ExperimentConfig.from_dict(merged)).run()
+            result, run_id = exp.to_dict(), exp.extras["experiment_id"]
+        with open(state_path, "a", encoding="utf-8") as f:
+            row = {"variant": variant, "result": result, "sweep_id": sweep_id, "kind": kind}
+            f.write(json.dumps(row, default=str) + "\n")
+        print(f"[{i}/{len(variants)}] done: {variant} -> {run_id}")
     return state_path
+
+
+def fill_templates(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Format top-level string values like "models/{model}_s{seed}.pt" with the
+    config's own top-level scalar values (so grid axes yield distinct paths)."""
+    scalars = {k: v for k, v in cfg.items() if isinstance(v, str | int | float)}
+    return {
+        k: v.format(**scalars) if isinstance(v, str) and "{" in v else v for k, v in cfg.items()
+    }
 
 
 def main() -> None:

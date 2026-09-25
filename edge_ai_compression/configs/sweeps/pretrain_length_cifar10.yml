@@ -1,0 +1,8 @@
+# Phase 5 training length: ResNet-18 (w0.5) trained for 10 / 30 / 90 epochs with a
+# full cosine schedule each (not truncated runs), 3 seeds = 9 runs.
+kind: train
+sweep_id: pretrain_length_cifar10
+base_config: edge_ai_compression/configs/train/pretrain_resnet_base.yml
+axes:
+  - [{seed: 0}, {seed: 1}, {seed: 2}]
+  - [{model: resnet18_w0.5_cifar, epochs: 10}, {model: resnet18_w0.5_cifar, epochs: 30}, {model: resnet18_w0.5_cifar, epochs: 90}]

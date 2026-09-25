@@ -1,0 +1,24 @@
+# Base for the Phase 5 ViT size sweep (AdamW recipe of train/vit_*_cifar10.yml).
+model: vit_s_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 256
+num_workers: 4
+device: cuda
+seed: 0
+variant: standard
+optimizer: adamw
+lr: 0.001
+momentum: 0.9
+weight_decay: 0.05
+label_smoothing: 0.1
+epochs: 200
+warmup_epochs: 10
+schedule: cosine
+num_checkpoints: 12
+checkpoint_dir: models/checkpoints
+export_path: models/pretrain/{model}_{variant}_e{epochs}_s{seed}.pt
+results_dir: results
+log_every_steps: 100
+signals: {probe_samples: 256, hessian: true, hessian_iters: 20, sharpness: true, rho: 0.05}
+signal_every_steps: 1000

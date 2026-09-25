@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -275,6 +275,10 @@ class ExperimentConfig:
 
     @staticmethod
     def from_dict(d: dict[str, Any]) -> ExperimentConfig:
+        known = {f.name for f in fields(ExperimentConfig)} | {"compression_order_tag"}
+        unknown = set(d) - known
+        if unknown:
+            raise ValueError(f"unknown experiment config keys: {sorted(unknown)}")
         comp = CompressionConfig.from_dict(_section(d, "compression"))
         order: list[str]
         if d.get("compression_order_tag"):

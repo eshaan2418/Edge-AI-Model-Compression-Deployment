@@ -1,0 +1,12 @@
+# Phase 5: compression-aware pre-training variants on ResNet-18 / CIFAR-10,
+# 3 seeds x 5 variants = 15 training runs (60 epochs each, signals logged).
+kind: train
+sweep_id: pretrain_variants_resnet18_cifar10
+base_config: edge_ai_compression/configs/train/pretrain_resnet_base.yml
+axes:
+  - [{seed: 0}, {seed: 1}, {seed: 2}]
+  - - {variant: standard}
+    - {variant: quant_noise, variant_options: {bits: 4, p: 0.5}, export_path: "models/pretrain/{model}_qnoise_e{epochs}_s{seed}.pt"}
+    - {variant: quant_noise, variant_options: {bits: 4, p: 1.0}, export_path: "models/pretrain/{model}_qat_e{epochs}_s{seed}.pt"}
+    - {variant: kurtosis, variant_options: {lam: 1.0, target: 1.8}}
+    - {variant: rigl, variant_options: {sparsity: 0.9, distribution: erk}}

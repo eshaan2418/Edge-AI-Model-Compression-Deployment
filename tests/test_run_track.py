@@ -50,3 +50,16 @@ def test_prune_track_smoke_reuses_checkpoint_and_records_sparsity(tmp_path):
         rows = [r for r in csv.DictReader(f) if r["pruning_type"] != "none"]
     assert rows and all(float(r["weight_sparsity"]) > 0.4 for r in rows)
     assert any(r["pruning_type"].endswith(("+finetune", "+lora")) for r in rows)
+
+
+def test_pretrain_track_smoke_logs_signals_and_distinct_checkpoints(tmp_path):
+    results, models = tmp_path / "results", tmp_path / "models"
+    run("pretrain_variants", [0], "cpu", results, models, smoke=True, skip_train=False)
+    with open(results / "training_runs.csv", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert [r["variant"] for r in rows] == ["standard", "quant_noise"]
+    exported = sorted(p.name for p in (models / "pretrain").iterdir())
+    assert len(exported) == 2 and all(name.endswith("_s0.pt") for name in exported)
+    with open(results / "training_signals.csv", newline="") as f:
+        sig = list(csv.DictReader(f))
+    assert {r["run_id"] for r in sig} == {r["run_id"] for r in rows}

@@ -1,0 +1,14 @@
+# Phase 5 scaling: 5 ResNet sizes x {standard, Quant-Noise} x 3 seeds = 30 runs
+# (30 epochs each). Compressibility vs model size is fit in Phase 6.
+kind: train
+sweep_id: pretrain_scaling_cifar10
+base_config: edge_ai_compression/configs/train/pretrain_resnet_base.yml
+axes:
+  - [{seed: 0}, {seed: 1}, {seed: 2}]
+  - - {model: resnet10_w0.25_cifar}
+    - {model: resnet10_w0.5_cifar}
+    - {model: resnet18_w0.5_cifar}
+    - {model: resnet18_w1.0_cifar}
+    - {model: resnet34_w1.0_cifar}
+  - - {variant: standard, epochs: 30}
+    - {variant: quant_noise, epochs: 30, variant_options: {bits: 4, p: 0.5}}

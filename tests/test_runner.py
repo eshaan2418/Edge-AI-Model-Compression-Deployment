@@ -71,3 +71,9 @@ def test_smoke_inference_config_records_backend(tmp_path):
     with open(experiments_csv(tmp_path), newline="") as f:
         row = next(csv.DictReader(f))
     assert row["backend"] == "edge_int8" and row["schema_version"] == "4"
+
+
+def test_unknown_top_level_key_raises():
+    base = load_experiment_config(SMOKE).to_dict()
+    with pytest.raises(ValueError, match="unknown experiment config keys"):
+        ExperimentConfig.from_dict({**base, "epochs": 3})
