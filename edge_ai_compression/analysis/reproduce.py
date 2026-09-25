@@ -124,6 +124,16 @@ def _pareto(results: Path, out: Path) -> list[Path]:
     return [plot_frontier(table, out / "pareto.png")]
 
 
+def _lm_degradation(results: Path, out: Path) -> list[Path]:
+    from edge_ai_compression.analysis.lm_degradation import degradation_table, plot_degradation
+
+    table = degradation_table(results)
+    if table.empty:
+        return []
+    table.to_csv(out / "lm_degradation.csv", index=False)
+    return [plot_degradation(table, out / "lm_degradation.png")]
+
+
 # name -> (required tables, producing config/notebook, function)
 ANALYSES: dict[str, tuple[tuple[str, ...], str, Callable[[Path, Path], list[Path]]]] = {
     "kernel study + roofline": (
@@ -143,6 +153,11 @@ ANALYSES: dict[str, tuple[tuple[str, ...], str, Callable[[Path, Path], list[Path
     ),
     "latency proxy": (("experiments.csv",), "backend_latency_m5 + kernel study", _latency_proxy),
     "pareto frontiers": (("experiments.csv",), "any experiment sweep", _pareto),
+    "small-LM degradation": (
+        ("lm_evals.csv",),
+        "configs/lm/tinystories_gpt_*.yml",
+        _lm_degradation,
+    ),
 }
 
 

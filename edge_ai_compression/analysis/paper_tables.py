@@ -220,6 +220,31 @@ def kernel_crossover(results: Path, figures: Path) -> str:
     )
 
 
+def lm_degradation(results: Path, figures: Path) -> str:
+    path = figures / "lm_degradation.csv"
+    if not path.is_file():
+        return pending("run configs/lm/tinystories_gpt_*.yml (3 seeds), then reproduce.sh")
+    t = pd.read_csv(path)
+    t = t[t["stage"] != "pretrain"]
+    rows = [
+        [
+            escape(r.model),
+            escape(r.stage),
+            escape(r.method),
+            fmt_ci(r.rel_capability, r.rel_capability_lo, r.rel_capability_hi, 3),
+            fmt_ci(r.rel_behavior, r.rel_behavior_lo, r.rel_behavior_hi, 3),
+            fmt_ci(r.gap, r.gap_lo, r.gap_hi, 2),
+            str(r.n_seeds),
+        ]
+        for r in t.itertuples()
+    ]
+    return tabular(
+        ["Model", "Stage", "Method", "Capability", "Behavior", "Gap", "Seeds"],
+        rows,
+        "relative to float; gap = capability - behavior",
+    )
+
+
 TABLES: dict[str, Callable[[Path, Path], str]] = {
     "ladder_ptq": ladder_ptq,
     "ladder_prune": ladder_prune,
@@ -227,6 +252,7 @@ TABLES: dict[str, Callable[[Path, Path], str]] = {
     "scaling_params": scaling,
     "latency_proxy": latency_proxy,
     "kernel_crossover": kernel_crossover,
+    "lm_degradation": lm_degradation,
 }
 
 
