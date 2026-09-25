@@ -1,8 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches: [main, master]
+  push:  # every branch: phase branches are stacked and reviewed before merge
   pull_request:
 
 jobs:
