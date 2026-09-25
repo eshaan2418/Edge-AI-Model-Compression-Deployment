@@ -23,15 +23,16 @@ STAGES = ("startup", "import", "load", "first_inference", "cold_start")
 def test_peak_rss_tracks_a_known_allocation():
     code = (
         "import numpy as np\n"
-        "from edge_ai_compression.benchmarking.memory import MIB, peak_rss_bytes\n"
-        "before = peak_rss_bytes()\n"
+        "from edge_ai_compression.benchmarking.memory import MIB, memory_sources, peak_rss_bytes\n"
+        "before, src0 = peak_rss_bytes(), memory_sources()\n"
         "a = np.ones(256 * MIB, dtype=np.uint8)\n"
-        "print((peak_rss_bytes() - before) / MIB)\n"
+        "print((peak_rss_bytes() - before) / MIB, src0, memory_sources())\n"
     )
     out = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, check=True, env=_worker_env()
     )
-    assert 240 <= float(out.stdout) <= 300
+    delta = float(out.stdout.split()[0])
+    assert 240 <= delta <= 300, out.stdout
 
 
 def test_isolated_run_reports_trace_stages_and_memory():
