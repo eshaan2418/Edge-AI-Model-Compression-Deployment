@@ -271,3 +271,34 @@ Rows go to `training_signals.csv` (run id, step, scalar summaries), with per-lay
 
 ### D7.4 The measurement pitfalls in the blog and paper appendix are described qualitatively
 - The magnitudes observed during development (from CI logs and development runs) are recorded in these DECISIONS entries with their context. They aren't experiment-DB results, so the blog and paper describe them without numbers.
+
+---
+
+## Phase 8 (stretch): small-LM track
+
+Started on request before Phases 1-7 have results. The recommendation stays to run those first (see PROGRESS).
+
+### Plan (self-approved)
+**Question:** does compression degrade post-trained *behavior* before raw *capability*?
+
+- **Data:** TinyStories and TinyStories-Instruct (Eldan & Li 2023), with a byte-level tokenizer (256 byte ids plus special tokens). Offline synthetic text is used for tests.
+- **Model:** decoder-only GPT (pre-norm, explicit `qkv`/`proj`/`fc1`/`fc2` linears so the Phase 3 quantizers apply unchanged, tied embeddings, KV cache). Sizes around 10M / 25M / 50M parameters.
+- **Lifecycle:**
+  1. pre-train (next-token cross-entropy)
+  2. SFT on instruction → story, with the loss on response tokens only
+  3. DPO (Rafailov et al. 2023) on preference pairs
+  4. compress with the same quantization ladder
+- **Capability vs behavior:**
+  - capability = held-out perplexity
+  - behavior = instruction-constraint satisfaction: the fraction of greedy generations containing every word the instruction requires (TinyStories-Instruct "Words:" field)
+  - the result is how fast each degrades along the ladder
+- **Preferences:** chosen = the reference story (satisfies the constraint). Rejected = the same story with the required words replaced by others (violates it). This targets exactly the measured behavior and is fully reproducible.
+- **Inference metrics:** time-to-first-token, decode tokens/s, KV-cache bytes, all through the same fresh-process discipline.
+- **Speculative decoding** (Leviathan et al. 2023; Chen et al. 2023) with a small draft model distilled from the target (logit KD). Report acceptance rate and speedup. It is lossless for greedy decoding (tested: identical output to plain greedy).
+
+### D8.1 Byte-level tokenizer
+- **Alternatives:** the GPT-2/GPT-Neo BPE that TinyStories models usually use.
+- **Why:** zero dependencies and no network access, identical in CI and on Colab, and nothing to version. The cost is about 4× longer sequences for the same text, which matters for context length and tokens/s comparisons, so all rates are reported per byte-token.
+
+### D8.2 A separate `lm/` package
+- The classification trainer and experiment runner assume (image, label) batches and accuracy metrics. The LM track reuses the quantizers, benchmarking statistics and fingerprinting, and adds its own training loop and two DB tables: `lm_runs.csv` and `lm_evals.csv`.
