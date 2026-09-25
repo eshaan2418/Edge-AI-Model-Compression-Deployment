@@ -55,10 +55,6 @@ fine-tuning; lower to engine (sparse24/csr, channel-pruned dense); connect to Ph
 - Kernels are single-threaded (D2.2): compare against torch/ORT at 1 thread.
 
 ## NEEDS ESHAAN
-0. **BLOCKER (2026-09-25): git commit signing / SSH push via 1Password fails**
-   (`1Password: failed to fill whole buffer`, `communication with agent failed`). Unlock 1Password
-   (or approve its prompt), then the pending Phase 3 docs commit can be created and pushed.
-   Signing was not disabled; that is your call.
 1. **Open the Phase 0 PR.** `gh` token can't create PRs. Run `! gh auth login -h github.com -w`, then:
    `gh pr create --base main --head consolidate --title "Consolidate legacy code into legacy/"`.
    Later phase PRs stack: `phase1-benchmarking` → base `consolidate`, and so on.
