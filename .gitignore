@@ -77,3 +77,13 @@ legacy/tflite/benchmark_results.md
 
 # C++ kernel build (build/ is ignored above)
 edge_ai_compression/inference/_C*.so
+
+# LaTeX build outputs
+paper/*.aux
+paper/*.bbl
+paper/*.blg
+paper/*.fdb_latexmk
+paper/*.fls
+paper/*.log
+paper/*.out
+paper/*.pdf

@@ -122,17 +122,20 @@ def _ladder(exps: pd.DataFrame, key: str, backends: set[str], other: str) -> str
 
 
 def ladder_ptq(results: Path, figures: Path) -> str:
+    todo = pending("run configs/sweeps/ptq_ladder_resnet18_cifar10.yml")
+    if not (results / "experiments.csv").is_file():
+        return todo
     exps = read_table(results / "experiments.csv")
-    out = _ladder(exps, "quantization_type", {"edge_quant", "edge_f32"}, "pruning_type")
-    return out or pending("run configs/sweeps/ptq_ladder_resnet18_cifar10.yml")
+    return _ladder(exps, "quantization_type", {"edge_quant", "edge_f32"}, "pruning_type") or todo
 
 
 def ladder_prune(results: Path, figures: Path) -> str:
+    todo = pending("run configs/sweeps/prune_ladder_resnet18_cifar10.yml")
+    if not (results / "experiments.csv").is_file():
+        return todo
     exps = read_table(results / "experiments.csv")
-    out = _ladder(
-        exps, "pruning_type", {"edge_csr", "edge_sparse24", "edge_f32"}, "quantization_type"
-    )
-    return out or pending("run configs/sweeps/prune_ladder_resnet18_cifar10.yml")
+    backends = {"edge_csr", "edge_sparse24", "edge_f32"}
+    return _ladder(exps, "pruning_type", backends, "quantization_type") or todo
 
 
 def early_prediction(results: Path, figures: Path, method: str = "w4a8") -> str:

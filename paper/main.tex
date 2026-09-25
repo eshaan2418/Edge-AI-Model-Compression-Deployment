@@ -1,0 +1,191 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+% Every number in this paper comes from paper/generated/*.tex or results/figures/,
+% both regenerated from the experiment DB by ./reproduce.sh. Missing results render
+% as a visible PENDING box; nothing is typed by hand.
+\newcommand{\pending}[1]{\fbox{\textcolor{red}{\textsc{pending}}: \small #1}}
+\newcommand{\fig}[3]{%
+  \IfFileExists{#1}{\includegraphics[width=#2\linewidth]{#1}}{\pending{#3}}}
+
+\title{Is Compressibility Predictable Early?\\
+\large Compression-aware training, a measured lifecycle, and training-time signals}
+\author{Eshaan Kapooswalla}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We ask whether compression-awareness during training yields models that quantize and prune
+better after training and run faster at inference, and whether a model's final
+compressibility can be predicted early in training from cheap signals. We build a
+measured lifecycle: compression-aware training variants (Quant-Noise, kurtosis
+regularization, RigL), a post-training ladder (RTN with calibrated activations, AdaRound,
+BRECQ, LSQ fine-tuning, Hessian-aware mixed precision, SmoothQuant, N:M and channel
+pruning with masked LoRA recovery), single-threaded CPU kernels (fp32, exact int8, int4
+weight-only, 2:4 and CSR sparse), and a benchmarking protocol that treats fresh processes as
+the unit of replication. Signals logged during training (weight kurtosis, weight and
+activation outlier ratios, Hessian trace, sharpness) are features for predicting the final
+model's accuracy drop under a fixed compression panel, evaluated on held-out training
+configurations. \textbf{Headline finding:} \pending{written after the Phase 5/6 runs; see
+Section~\ref{sec:results}}.
+\end{abstract}
+
+\section{Introduction}
+Model compression is usually studied one stage at a time: a quantization method is evaluated
+on a fixed pre-trained checkpoint, and a pruning method on another. Yet the checkpoint's
+training history plausibly determines how much compression it tolerates. Weight
+distributions with heavy tails waste quantization levels~\citep{shkolnik2020robust}, and
+flat minima tolerate weight perturbations~\citep{keskar2017large,foret2021sam}. If
+compressibility is a property of training, then (i) training can be made compression-aware,
+and (ii) compressibility may be \emph{predictable} before training ends, which would let
+practitioners discard poor candidates early.
+
+We study both questions on image classification at CIFAR scale, with every measurement
+produced by one reproducible pipeline:
+\begin{itemize}
+  \item \textbf{A measured lifecycle.} Training variants, a post-training ladder, lowering to
+  our own CPU kernels, and latency/memory benchmarking. All results live in one experiment
+  database, and every reported number traces to a run identifier.
+  \item \textbf{A benchmarking protocol} that uses fresh processes as the unit of
+  replication~\citep{kalibera2013rigorous} and records a hardware/software fingerprint for
+  every run.
+  \item \textbf{An early-predictability study} with leave-one-configuration-out evaluation,
+  baselines that control for model size, and signal ablations.
+  \item \textbf{A latency-proxy study} testing whether FLOPs, parameter count or sparsity
+  predict measured latency across kernel families, compared with a learned per-layer proxy.
+\end{itemize}
+
+\section{Related work}
+\paragraph{Post-training quantization.} Rounding to nearest with calibrated activation
+ranges is the standard baseline~\citep{krishnamoorthi2018,jacob2018quantization,nagel2021white}.
+AdaRound learns per-weight rounding by layer-wise output reconstruction~\citep{nagel2020adaround};
+BRECQ reconstructs whole blocks~\citep{li2021brecq}; LSQ learns step sizes during
+fine-tuning~\citep{esser2020lsq}; HAWQ allocates bits by Hessian
+sensitivity~\citep{dong2020hawqv2}; SmoothQuant migrates activation outliers into
+weights~\citep{xiao2023smoothquant}, motivated by outliers that emerge at large
+scale~\citep{dettmers2022llmint8}.
+\paragraph{Compression-aware training.} Quant-Noise quantizes random weight subsets during
+training~\citep{fan2021quantnoise}; kurtosis regularization makes weights uniform-like and
+robust to quantization~\citep{shkolnik2020robust}; RigL trains sparse networks by dynamic
+drop-and-grow~\citep{evci2020rigl}.
+\paragraph{Pruning.} Structured N:M sparsity targets hardware
+support~\citep{mishra2021accelerating,zhou2021nm}; channel pruning ranks filters by norm or
+BN scale~\citep{li2017pruning,liu2017slimming}; low-rank adapters~\citep{hu2022lora} are a
+parameter-efficient recovery option.
+\paragraph{Early signals.} Early-Bird tickets predict pruning masks early in
+training~\citep{you2020earlybird}; curvature and sharpness measures relate to
+generalization~\citep{yao2020pyhessian,jiang2020fantastic}, with known caveats about
+reparametrization~\citep{dinh2017sharp}.
+\paragraph{Latency.} FLOPs is an indirect proxy for speed~\citep{ma2018shufflenetv2}; learned
+latency predictors are an alternative~\citep{zhang2021nnmeter}. We use the roofline
+model~\citep{williams2009roofline} to explain kernel behaviour.
+
+\section{System}
+\paragraph{Benchmarking.} Each measurement runs in $R$ fresh Python processes. Each process
+records its cold-start stages, warms up, times at least $N$ calls with the garbage collector
+disabled, and reports its peak resident memory (\texttt{/proc} VmHWM on Linux; see
+Appendix~\ref{app:pitfalls}). We report the median of per-process medians with a
+percentile-bootstrap CI over processes, and pooled percentiles only descriptively, because
+iterations within a process are autocorrelated~\citep{kalibera2013rigorous,mytkowicz2009wrong}.
+\paragraph{Kernels and engine.} Single-threaded C++ GEMMs with runtime ISA dispatch (NEON with
+dot-product instructions; AVX2/AVX-512): fp32 with packed weight panels, exact
+int8$\times$int8$\rightarrow$int32, int4 weight-only with per-group scales, 2:4 structured
+and CSR sparse. A torch.fx-based engine folds BatchNorm, fuses ReLU and lowers convolutions to
+im2col+GEMM. For quantized models it uses exactly the integer weights and scales of the
+simulated model. Every lowered layer matches its simulation to $10^{-5}$ relative given
+identical inputs (tested). End to end the two agree up to rounding-boundary flips.
+\paragraph{Experiment database.} One row per run with configuration tags, accuracy, latency
+statistics, memory, measured weight sparsity, fingerprint hash and git commit, plus per-run
+artifacts. Figures and every table in this paper are regenerated from the database by
+\texttt{reproduce.sh}.
+
+\section{Method}
+\paragraph{Training variants.} Standard SGD; Quant-Noise (4-bit, $p{=}0.5$) and its $p{=}1$
+limit, i.e.\ quantization-aware training from scratch; kurtosis regularization toward 1.8; RigL at
+90\% sparsity with ERK allocation.
+\paragraph{Signals.} At initialization, at log-spaced checkpoints and at a fixed interval, on
+a fixed probe batch of \emph{training} data: per-layer weight kurtosis, max$|w|$/std, weight
+norms, input-activation outlier ratios, the Hutchinson trace of the loss
+Hessian~\citep{hutchinson1989}, and first-order SAM sharpness~\citep{foret2021sam}.
+\paragraph{Compressibility target.} The accuracy drop of the final model under a fixed,
+training-free panel: RTN W8A8, RTN W4A8, W4 weight-only (group 32), 2:4, and 50\%/80\%
+unstructured.
+\paragraph{Prediction protocol.} Features are the signals at training fraction $f$, plus
+$\log_{10}$ parameter count and a variant one-hot. Predictors (random forest, gradient
+boosting, MLP, Gaussian process) are compared with a mean baseline and a parameters-only
+baseline. Evaluation holds out every seed of one configuration at a time. CIs come from a
+cluster bootstrap over configurations.
+
+\section{Experimental setup}
+CIFAR-10~\citep{krizhevsky2009cifar}. ResNets~\citep{he2016resnet} of depth 10/18/34 and width
+0.25/0.5/1.0, and three ViTs~\citep{dosovitskiy2021vit} (patch 4). Three training seeds per
+configuration. Latency is measured on an Apple M5 Pro (primary platform, OS-scheduled, all
+backends at one thread) and on x86 cloud VMs (secondary, noisy). The CIs account for the
+noise, and the platform caveats are listed in Section~\ref{sec:limits}.
+
+\section{Results}\label{sec:results}
+\subsection{The post-training ladder}
+\begin{center}\small\input{generated/ladder_ptq}\end{center}
+\subsection{Pruning and recovery}
+\begin{center}\small\input{generated/ladder_prune}\end{center}
+\subsection{Early predictability of compressibility}
+\begin{center}
+\fig{../results/figures/early_prediction_w4a8.png}{0.7}{run the Phase 5 tracks + compress\_runs, then reproduce.sh}\\[4pt]
+\small\input{generated/early_prediction_w4a8}
+\end{center}
+\subsection{Scaling}
+\begin{center}\small\input{generated/scaling_params}\end{center}
+\subsection{Do FLOPs predict latency?}
+\begin{center}\small\input{generated/latency_proxy}\end{center}
+\subsection{When does sparsity pay on a CPU?}
+\begin{center}
+\fig{../results/figures/kernel_sparsity_m5_sparsity.png}{0.6}{run configs/studies/kernel\_sparsity\_m5.yml}\\[4pt]
+\small\input{generated/kernel_crossover}
+\end{center}
+
+\section{Limitations}\label{sec:limits}
+\begin{itemize}
+  \item CIFAR-scale models and data. ImageNet validation against the published PTQ numbers
+  needs license-gated data and is \pending{run configs/sweeps/ptq\_validation\_imagenet.yml}.
+  \item Kernels are single-threaded, so absolute latencies understate what a multi-threaded
+  runtime achieves.
+  \item Latency is measured on one primary machine, which cannot pin threads to cores. Energy
+  is not measured.
+  \item Three seeds per configuration. CIs are percentile bootstraps and under-cover at small $n$.
+  \item Activations are symmetric int8, including after ReLU (one bit unused), to match the
+  kernels.
+  \item The prediction targets use a training-free panel. Methods with recovery or
+  reconstruction may change the ranking.
+\end{itemize}
+
+\section*{Reproducibility}
+Every experiment is one configuration file and one command. \texttt{./reproduce.sh}
+regenerates all figures, and all tables in this paper, from the experiment database. Design
+decisions, including the pitfalls below, are logged in \texttt{docs/DECISIONS.md}.
+
+\appendix
+\section{Measurement pitfalls found while building the pipeline}\label{app:pitfalls}
+Each of these would have silently corrupted results:
+\begin{itemize}
+  \item On Linux, \texttt{ru\_maxrss} in a spawned worker reports the \emph{parent's} peak
+  memory: the kernel folds the pre-exec address space's high-water mark in at
+  \texttt{execve}. Use \texttt{/proc} VmHWM.
+  \item Multiplying by $1/s$ instead of dividing by $s$ when quantizing flips rounding ties,
+  so the engine and the simulation diverge.
+  \item FLOP counters that match only float layer types report zero FLOPs for quantized models.
+  \item A missing checkpoint path silently evaluated randomly initialized weights.
+\end{itemize}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}

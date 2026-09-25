@@ -44,6 +44,22 @@ jobs:
           python train_model.py --config edge_ai_compression/configs/train/smoke_train.yml
           ./reproduce.sh results/smoke results/smoke/figures
 
+  paper:
+    # Compiles the paper (tables are the committed generated/*.tex, PENDING until the
+    # real runs exist) so LaTeX errors are caught on every push.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile paper
+        uses: xu-cheng/latex-action@e2f99d4b3685b0da93f97e1b86ad8fab81105098  # v3
+        with:
+          root_file: main.tex
+          working_directory: paper
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paper
+          path: paper/main.pdf
+
   avx512-emulated:
     # GitHub's x86 runners usually lack AVX-512. Intel SDE emulates a Sapphire
     # Rapids CPU so the AVX-512 kernel paths are correctness-tested (never
