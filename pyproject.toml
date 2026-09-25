@@ -22,10 +22,10 @@ dependencies = [
     "psutil>=5.9",
 ]
 
-# TensorFlow/Keras stack for the original root scripts (train_baseline.py,
-# benchmark.py, quantize_model.py, distill_model.py). Not needed for the
-# PyTorch framework or the test suite. `tf-mot` adds the pruning toolkit used
-# by prune_model.py.
+# TensorFlow/Keras stack for the frozen legacy TFLite scripts in legacy/tflite/
+# (train_baseline.py, benchmark.py, quantize_model.py, distill_model.py). Not
+# needed for the PyTorch framework or the test suite. `tf-mot` adds the pruning
+# toolkit used by legacy/tflite/prune_model.py.
 [project.optional-dependencies]
 tf = ["tensorflow>=2.16", "tf-keras>=2.16"]
 tf-mot = ["tensorflow>=2.16", "tf-keras>=2.16", "tensorflow-model-optimization>=0.8"]
