@@ -4,7 +4,8 @@ Resume point for autonomous work. Updated after every commit.
 
 - **Mission:** see the mission brief (pre-training → post-training/compression → export → C++ inference → benchmark → analysis).
 - **Decisions:** `docs/DECISIONS.md`. **Interview prep:** `docs/INTERVIEW_PREP.md`.
-- **Branch stack:** `main` (has phases 0-3 via PRs #3-#6) ← `phase4-pruning` ← `phase5-pretraining` ← `phase6-studies` ← `phase7-paper`. Merge in order.
+- **Branches:** everything (phases 0-7) is in `main` (phases 0-3 via PRs #3-#6; phases 4-7
+  fast-forwarded on 2026-09-25 after CI passed). The `phase*` branches are kept for history.
 - **Environment:** `.venv/` (Python 3.12 locally, CI 3.11). Checks before every commit:
   `ruff check . && ruff format --check . && pytest -q`.
 
@@ -81,9 +82,7 @@ Phase 8 (small-LM track) is not started: it is gated on 1-7 having real results.
 - Kernels are single-threaded (D2.2): compare against torch/ORT at 1 thread.
 
 ## NEEDS ESHAAN
-1. **Open the Phase 0 PR.** `gh` token can't create PRs. Run `! gh auth login -h github.com -w`, then:
-   `gh pr create --base main --head consolidate --title "Consolidate legacy code into legacy/"`.
-   Later phase PRs stack: `phase1-benchmarking` → base `consolidate`, and so on.
+1. ~~Open the phase PRs~~: done, all phases are in `main`.
 2. **(Optional) Enable AVX-512 correctness tests in CI.** They run the AVX-512 kernels under Intel SDE
    emulation, which requires accepting Intel's SDE license. If you accept it: repo Settings ->
    Secrets and variables -> Actions -> Variables -> New variable `ENABLE_SDE` = `true`.
