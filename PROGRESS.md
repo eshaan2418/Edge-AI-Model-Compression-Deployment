@@ -8,30 +8,31 @@ Resume point for autonomous work. Updated after every commit.
 - **Environment:** `.venv/` (Python 3.12 locally, CI 3.11). Checks before every commit:
   `ruff check . && ruff format --check . && pytest -q`.
 
-## Current phase: 1 (benchmarking harness), branch `phase1-benchmarking`
+## Current phase: 2 (C++ kernels + export), branch `phase2-kernels` (stacked on `phase1-benchmarking`)
 
-### Done
-- Phase 0 complete on `consolidate` (pushed). PR not opened: `gh` token lacks PR permission (see NEEDS ESHAAN).
-- `benchmarking/stats.py`: summarize, bootstrap_ci, compare (MWU, Cliff's delta, ratio CI).
-- `benchmarking/config.py`: BenchmarkConfig with strict key validation.
-- `benchmarking/timing.py`: measure_latency (warmup/timed phases, GC off, injectable clock), Linux CPU affinity.
-- `benchmarking/fingerprint.py`: static (hashed) / dynamic / git.
-- Ruff pinned to 0.16.8 in pre-commit and the dev extra.
+### Phase 1 (benchmarking harness): COMPLETE, pushed on `phase1-benchmarking`
+- `benchmarking/`: stats (bootstrap CI, MWU, Cliff's delta), config (strict keys), timing (GC off,
+  warmup/timed bounds), fingerprint (static hashed / dynamic / git), memory (ru_maxrss), worker +
+  isolation (fresh process per repeat, cold-start stages), energy (NullMeter), report, evaluator.
+- Experiment DB schema v2, always on, the only output. Header mismatch raises. results_dir configurable.
+- Removed: markdown table, runs.jsonl, hardware/, latency_profiler, memory_profiler, energy_estimator,
+  with_experiment_db.yml, configs/hardware/.
+- Fixes: dynamic quantization NoQEngine on arm64; silent random-weights fallback on missing
+  checkpoint; compression_order column recorded stages that didn't run.
+- Configs: smoke_cpu.yml, smoke_benchmark.yml (both in CI). Docs: docs/benchmarking.md.
 
-### Next (Phase 1)
-1. `benchmarking/memory.py` + `benchmarking/worker.py` + `benchmarking/isolation.py` (spawned-process benchmark, cold-start stages). Config: replace `input_shape` with `batch_size` (D1.7).
-2. `benchmarking/energy.py` (EnergyMeter protocol, NullMeter only).
-3. `benchmarking/report.py` + rewrite `evaluator.py` on top of the above.
-4. Experiment DB: new schema, header-mismatch error, results_dir parameter; always-on in the runner; delete ResultLogger / runs.jsonl / benchmark_append.md; surrogate + search_compression column renames.
-5. Delete `hardware/`, `experiments/run_hardware_eval.py`, `configs/hardware/`, `latency_profiler.py`, `memory_profiler.py`, `energy_estimator.py`, `configs/experiments/with_experiment_db.yml`.
-6. `benchmarking/cli.py` + `configs/experiments/smoke_benchmark.yml`; update the other configs.
-7. README + docs; INTERVIEW_PREP Phase 1; push branch.
+### Next (Phase 2)
+Write the Phase 2 plan into DECISIONS (no approval gate), then implement: C++ kernel library
+(NEON primary; AVX2/AVX-512 correctness in CI), nanobind/pybind11 bindings, CMake in CI, export path.
 
 ### Later phases
-2 kernels + export · 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
+3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
 
 ## Open issues
 - The laptop was on battery during development: real benchmark runs need AC power (strict_environment).
+- torch 2.14 deprecates quantized tensor dtypes (qint8 etc.). Phase 3 should use fake-quant simulation
+  plus our own int kernels rather than torch.ao quantized modules (DECISIONS D1.14).
+- Percentile-bootstrap CIs with 5 processes under-cover; use >=10 for headline claims.
 
 ## NEEDS ESHAAN
 1. **Open the Phase 0 PR.** `gh` token can't create PRs. Run `! gh auth login -h github.com -w`, then:
