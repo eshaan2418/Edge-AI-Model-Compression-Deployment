@@ -101,6 +101,16 @@ def _mse_scale(data: torch.Tensor, base: torch.Tensor, bits: int, steps: int = 8
     return best
 
 
+def scale_2d(scale: torch.Tensor, spec: WeightSpec, m: int, k: int) -> torch.Tensor:
+    """Expand a compact scale from ``weight_scale`` to one scale per element of [M, K]."""
+    if spec.granularity == "per_group":
+        assert spec.group_size is not None
+        return scale.reshape(m, -1).repeat_interleave(spec.group_size, dim=1)[:, :k]
+    return (
+        scale.reshape(-1, 1).expand(m, k) if scale.numel() > 1 else scale.reshape(1, 1).expand(m, k)
+    )
+
+
 def fake_quant_weight(w: torch.Tensor, scale: torch.Tensor, spec: WeightSpec) -> torch.Tensor:
     """Fake-quantize a weight of any shape with a scale from ``weight_scale``."""
     w2d = w.reshape(w.shape[0], -1)
