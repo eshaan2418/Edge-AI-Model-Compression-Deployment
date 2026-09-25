@@ -252,3 +252,6 @@ Rows go to `training_signals.csv` (run id, step, scalar summaries), with per-lay
 
 ### D6.2 Analyses are validated on synthetic DBs with known ground truth
 - Before real data exists, each analysis is tested on a synthetic experiment DB where the answer is known: a planted signal–target relationship, a planted power law, a planted latency model. The tests assert the pipeline recovers it. This checks the analysis code, not any scientific claim.
+
+### D6.3 FLOPs counted from per-layer GEMM shapes, including quantized layers
+- **Bug found:** `estimate_flops_macs` hooked only `nn.Conv2d`/`nn.Linear`, so every quantized run (QuantConv2d/QuantLinear) had `flops = 0` in the DB, and it crashed on [B, T, C] inputs (ViT). Now `layer_gemm_shapes` records (M, N, K) per float or quantized layer; FLOPs are batch × Σ M·N·K. The per-layer shapes are also stored in each run's `metrics.json` for the latency-proxy study (channel-pruned shapes can't be recovered from the model name).

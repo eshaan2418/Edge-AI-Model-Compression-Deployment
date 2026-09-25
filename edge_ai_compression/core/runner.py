@@ -23,7 +23,11 @@ from edge_ai_compression.experiment_db.writer import (
     append_jsonl_line,
     write_artifacts,
 )
-from edge_ai_compression.theory.model_complexity import count_parameters, estimate_flops_macs
+from edge_ai_compression.theory.model_complexity import (
+    count_parameters,
+    estimate_flops_macs,
+    layer_gemm_shapes,
+)
 from edge_ai_compression.utils.config_loader import load_yaml
 from edge_ai_compression.utils.reproducibility import set_seed
 
@@ -121,6 +125,7 @@ class ExperimentRunner:
 
         nparams = count_parameters(work)
         flops = estimate_flops_macs(work, report.input_shape)
+        metrics["layer_shapes"] = layer_gemm_shapes(work, (1, *report.input_shape[1:]))
 
         prune_sec = cfg.compression.pruning
         pruning_type = prune_sec.tag if prune_sec.enabled else "none"
