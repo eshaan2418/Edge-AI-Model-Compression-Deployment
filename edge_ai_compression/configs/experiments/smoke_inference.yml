@@ -1,0 +1,35 @@
+# Offline smoke test of the export / C++ kernel path: prune a ResNet-18 to 50%,
+# run it on the int8 kernel engine (per-channel weights, dynamic activations),
+# and log accuracy and latency to the experiment DB. Needs the kernels built
+# (scripts/build_kernels.sh). Swap `backend:` for onnxruntime, edge_f32, edge_w4,
+# edge_sparse24, edge_csr, or torch_eager.
+model: resnet18_cifar
+dataset: fake
+data_dir: data
+batch_size: 16
+num_workers: 0
+device: cpu
+seed: 42
+limit_samples: 16
+checkpoint_out: models/smoke_inference.pt
+compression_order_tag: prune
+compression:
+  pruning:
+    enabled: true
+    amount: 0.5
+  quantization:
+    enabled: false
+  distillation:
+    enabled: false
+benchmark:
+  backend: edge_int8
+  batch_size: 1
+  num_threads: 1
+  warmup_iters: 2
+  min_warmup_s: 0.0
+  iters: 5
+  process_repeats: 2
+  strict_environment: false
+experiment_db:
+  results_dir: results/smoke
+  diagnostics_max_batches: 1

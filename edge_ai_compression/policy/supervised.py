@@ -15,11 +15,13 @@ def suggest_config_from_table(
     max_size = constraints.get("max_size_mb", 1e9)
     min_acc = constraints.get("min_accuracy", 0.0)
     sub = df[
-        (df["latency_mean"] <= max_lat) & (df["size_mb"] <= max_size) & (df["accuracy"] >= min_acc)
+        (df["latency_median"] <= max_lat)
+        & (df["size_mb"] <= max_size)
+        & (df["accuracy"] >= min_acc)
     ]
     if sub.empty:
         sub = df
-    score = sub["accuracy"] - 0.01 * sub["latency_mean"] - 0.02 * sub["size_mb"]
+    score = sub["accuracy"] - 0.01 * sub["latency_median"] - 0.02 * sub["size_mb"]
     best = sub.iloc[int(score.argmax())]
     return {
         "compression_order": best.get("compression_order", ""),

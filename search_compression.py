@@ -18,14 +18,14 @@ def main() -> None:
     p.add_argument(
         "--metrics",
         nargs="+",
-        default=["accuracy", "latency_mean", "size_mb", "ram_mb"],
+        default=["accuracy", "latency_median", "size_mb", "peak_rss_mib"],
     )
     p.add_argument("--results", type=Path, default=Path("results/experiments.csv"))
     p.add_argument("--out", type=Path, default=Path("results/pareto_frontier.json"))
     args = p.parse_args()
 
     if not args.results.is_file():
-        print(f"No results at {args.results}; run experiments with experiment_db enabled first.")
+        print(f"No results at {args.results}; run some experiments first.")
         return
 
     df = pd.read_csv(args.results)

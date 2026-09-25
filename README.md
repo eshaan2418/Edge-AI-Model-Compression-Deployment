@@ -32,22 +32,22 @@ pip install -e ".[dev]"
 
 # Sanity check:
 ruff check .
-pytest -q                          # 10 tests, no downloads
+pytest -q                          # CPU only, no downloads
 
-# Tiny end‑to‑end experiment — fully offline, no downloads, ~3s on CPU:
+# Tiny end‑to‑end experiment — fully offline, no downloads, seconds on CPU:
 python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
 ```
 
 The smoke config (`smoke_cpu.yml`) uses a **synthetic `fake` dataset** (random
 CIFAR‑shaped tensors — no files, no network), prunes a ResNet‑18 to 50%
-sparsity, evaluates it, and appends a row to
-`edge_ai_compression/results/benchmark_append.md`. The whole pipeline finishes
-in a few seconds. Swap `dataset: fake` → `dataset: cifar10` in the config for a
-real run.
+sparsity, benchmarks it in fresh processes, and appends a row to the
+experiment DB under `results/smoke/`. Swap `dataset: fake` → `dataset: cifar10`
+in the config for a real run.
 
 ### Optional extras
 
 ```bash
+pip install -e ".[kernels,export]" && scripts/build_kernels.sh   # C++ kernels + ONNX Runtime
 pip install -e ".[tf-mot]"   # TensorFlow + tf-keras + tf-mot (legacy/tflite/ scripts)
 pip install -e ".[viz]"      # matplotlib (plot_results.py)
 pip install -e ".[all]"      # everything above
@@ -64,8 +64,9 @@ dependencies — the other two just point at it.
 Run a compression experiment from a YAML config:
 
 ```bash
-# Fast smoke test (synthetic data, offline, ~3s):
+# Fast smoke tests (synthetic data, offline):
 python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
+python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_benchmark.yml
 
 # Full runs (download + use the whole dataset — slower):
 python run_experiment.py --config edge_ai_compression/configs/experiments/baseline_eval.yml
@@ -88,15 +89,18 @@ python search_compression.py --objective pareto \
 python train_surrogate.py --results results/experiments.csv --out results/surrogates
 python analyze_failures.py --experiment-id <uuid>
 python plot_results.py                                # needs .[viz]
-python launch_sweep.py --config configs/sweeps/full_compression_study.yml
+python launch_sweep.py --config edge_ai_compression/configs/sweeps/full_compression_study.yml
 python resume_sweep.py --sweep-id full_compression_study
+python run_kernel_study.py --config edge_ai_compression/configs/studies/smoke_kernel_study.yml  # needs kernels
 ```
 
 ### What the framework implements
 
 | Area | Capability |
 |------|------------|
-| **Experiment DB** | Opt‑in logging to `results/experiments.csv` / `.jsonl` and `results/artifacts/{id}/` (config, metrics, `model.pt`, latency trace, confusion matrix, failure cases). Enable with `experiment_db.enabled: true` (see `configs/experiments/with_experiment_db.yml`). |
+| **Experiment DB** | The only results output, always on: one row per run in `<results_dir>/experiments.csv` / `.jsonl` (schema v2) plus `artifacts/{id}/` (config, metrics, fingerprint, `model.pt`, per‑process latency traces, confusion matrix, failure cases). |
+| **Benchmarking** | Latency and memory measured in fresh processes (default 5 × 1000 timed iterations after warmup); median of per‑process medians with bootstrap CI; cold‑start stages; peak RSS; hardware/software fingerprint per run. See [`docs/benchmarking.md`](docs/benchmarking.md). |
+| **Inference** | C++ kernels (fp32, exact int8, int4 weight-only, 2:4 and CSR sparse; NEON / AVX2 / AVX‑512) with nanobind bindings; an FX engine that runs CNNs on them; backends `torch_eager`, `onnxruntime`, `edge_{f32,int8,w4,sparse24,csr}`; kernel study + roofline analysis. See [`docs/inference.md`](docs/inference.md). |
 | **Pruning** | Global unstructured (`magnitude`) and `layerwise_adaptive` with `magnitude` / `gradient` / `activation` / `ablation` scorers. |
 | **Quantization** | Dynamic linear (PyTorch). |
 | **Distillation** | KD from a teacher checkpoint (temperature + alpha). |
@@ -106,7 +110,7 @@ python resume_sweep.py --sweep-id full_compression_study
 | **Diagnostics** | Confusion matrices, per‑class accuracy, ECE, NLL, failure cases. |
 | **Datasets** | `cifar10`, `cifar100`, `tiny_imagenet`, and `fake` (synthetic, offline) via `build_loaders()`. |
 
-Layout: `core`, `compression`, `optimization`, `benchmarking`, `hardware`,
+Layout: `core`, `compression`, `optimization`, `benchmarking`, `inference`,
 `analysis`, `data`, `utils`, `experiment_db`, `surrogate`, `policy`, `theory`,
 `configs/`, `experiments/`, `auto_compress.py`.
 
@@ -126,8 +130,8 @@ It is not installed with the package and is kept for reference only; see
 ```
 edge_ai_compression/     PyTorch research framework (models, data, compression, search, DB)
 run_experiment.py search_compression.py train_surrogate.py ...   root wrappers
-configs/sweeps/          sweep definitions for launch_sweep.py
-edge_ai_compression/configs/   experiment / dataset / hardware / search-space YAML
+edge_ai_compression/configs/   experiment / dataset / search-space / sweep / study YAML
+csrc/                    C++ kernels (CMake + nanobind), built by scripts/build_kernels.sh
 tests/                   pytest suite (CPU, no network)
 legacy/                  frozen PyTorch CLI + TF/TFLite scripts (not installed)
 models/  data/  results/ generated artifacts (git-ignored)
@@ -147,7 +151,7 @@ pytest -q             # tests
 ```
 
 CI (`.github/workflows/ci.yml`) runs `ruff check .`, `ruff format --check .`,
-`pytest -q`, and the offline smoke experiment on Python 3.11.
+`pytest -q`, and the offline smoke experiments on Python 3.11.
 
 ## License
 

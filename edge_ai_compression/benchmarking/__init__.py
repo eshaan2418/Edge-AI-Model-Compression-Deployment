@@ -1,3 +1,6 @@
-from edge_ai_compression.benchmarking.evaluator import BenchmarkReport, Evaluator, ResultLogger
+"""Latency / memory measurement, statistics, and environment fingerprinting.
 
-__all__ = ["BenchmarkReport", "Evaluator", "ResultLogger"]
+Intentionally import-free: the benchmark worker runs as
+``python -m edge_ai_compression.benchmarking.worker`` and must not pull in torch
+before it starts timing the cold start.
+"""

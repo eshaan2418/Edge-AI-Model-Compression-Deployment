@@ -105,13 +105,29 @@ class DistillationStage(CompressionStage):
         )
 
 
+STAGE_NAMES = ("distill", "prune", "quantize")
+
+
+def enabled_stage_names(order: list[str], cfg: CompressionConfig) -> list[str]:
+    """Stages from ``order`` that will actually run, in order."""
+    unknown = [n for n in order if n not in STAGE_NAMES]
+    if unknown:
+        raise ValueError(f"unknown compression stages {unknown}; expected {STAGE_NAMES}")
+    enabled = {
+        "distill": cfg.distillation.enabled,
+        "prune": cfg.pruning.enabled,
+        "quantize": cfg.quantization.enabled,
+    }
+    return [n for n in order if enabled[n]]
+
+
 def build_stages_for_order(
     order: list[str],
     cfg: CompressionConfig,
 ) -> list[CompressionStage]:
     stages: list[CompressionStage] = []
-    for name in order:
-        if name == "distill" and cfg.distillation.enabled:
+    for name in enabled_stage_names(order, cfg):
+        if name == "distill":
             stages.append(
                 DistillationStage(
                     teacher_ckpt=cfg.distillation.teacher_ckpt,
@@ -125,9 +141,9 @@ def build_stages_for_order(
                     device="cpu",
                 )
             )
-        elif name == "prune" and cfg.pruning.enabled:
+        elif name == "prune":
             stages.append(PruningStage(cfg.pruning))
-        elif name == "quantize" and cfg.quantization.enabled:
+        elif name == "quantize":
             stages.append(QuantizationStage(mode=cfg.quantization.mode))
     return stages
 

@@ -62,4 +62,5 @@ python legacy/tflite/combine_and_quantize.py --pruned models/pruned_model \
 ```
 
 `benchmark.py` appends a row to `legacy/tflite/benchmark_results.md` on each
-run. CI does not install TensorFlow, so these scripts are lint-checked only.
+run (git-ignored; created on first use). CI does not install TensorFlow, so
+these scripts are lint-checked only.

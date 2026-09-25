@@ -1,0 +1,27 @@
+# Phase 2 kernel study on the primary platform (Apple M5 Pro, AC power).
+# Questions: where does each kernel sit on the roofline, when does int8 / int4
+# weight-only help, and at what sparsity does an unstructured (CSR) kernel beat
+# dense, compared with 2:4 at a fixed 50%?
+# Shapes: every conv/linear GEMM of ResNet-18 at 32x32 (batch 1), plus two
+# batch-1 GEMV shapes where weight bandwidth dominates.
+study: kernel_sparsity_m5
+results_dir: results
+peaks: true
+isas: [auto]
+shapes_from_model: {model: resnet18_cifar, input_shape: [3, 32, 32]}
+shapes:
+  - [1000, 1, 512]
+  - [4096, 1, 4096]
+ops:
+  - gemm_f32
+  - gemm_s8
+  - gemm_w4
+  - gemm_sparse24
+  - {op: gemm_csr, sparsity: [0.5, 0.7, 0.8, 0.9, 0.95, 0.98]}
+benchmark:
+  warmup_iters: 20
+  min_warmup_s: 0.5
+  iters: 200
+  min_time_s: 1.0
+  process_repeats: 10
+  strict_environment: true

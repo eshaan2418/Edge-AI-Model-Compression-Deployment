@@ -1,3 +1,0 @@
-device_type: raspberry_pi
-threads: 4
-target_latency_ms: 15

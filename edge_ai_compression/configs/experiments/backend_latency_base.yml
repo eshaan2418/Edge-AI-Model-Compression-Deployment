@@ -1,0 +1,35 @@
+# Base config for the backend latency comparison (sweeps/backend_latency_m5.yml).
+# LATENCY ONLY: random weights on synthetic data, so the accuracy column is
+# meaningless. Pruning at 50% is applied so the CSR backend has zeros to exploit.
+# All backends run at 1 thread (the C++ kernels are single-threaded, D2.2).
+model: resnet18_cifar
+dataset: fake
+data_dir: data
+batch_size: 32
+num_workers: 0
+device: cpu
+seed: 42
+limit_samples: 32
+checkpoint_out: models/backend_latency.pt
+compression_order_tag: prune
+compression:
+  pruning:
+    enabled: true
+    amount: 0.5
+  quantization:
+    enabled: false
+  distillation:
+    enabled: false
+benchmark:
+  backend: torch_eager
+  batch_size: 1
+  num_threads: 1
+  warmup_iters: 50
+  min_warmup_s: 1.0
+  iters: 500
+  min_time_s: 0.0
+  process_repeats: 10
+  strict_environment: true
+experiment_db:
+  results_dir: results
+  diagnostics_max_batches: 1

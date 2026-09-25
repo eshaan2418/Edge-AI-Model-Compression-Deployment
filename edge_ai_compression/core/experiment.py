@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
+from edge_ai_compression.benchmarking.config import BenchmarkConfig
 from edge_ai_compression.core.compression_orders import parse_order
+from edge_ai_compression.experiment_db.paths import DEFAULT_RESULTS_DIR
 
 
 def _section(d: dict[str, Any], key: str, default: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -72,6 +75,30 @@ class CompressionConfig:
         )
 
 
+@dataclass(frozen=True)
+class ExperimentDBConfig:
+    """The ``experiment_db:`` section. The DB is always on; it is the only results output."""
+
+    results_dir: str = str(DEFAULT_RESULTS_DIR)
+    diagnostics_max_batches: int = 15
+
+    @property
+    def path(self) -> Path:
+        return Path(self.results_dir)
+
+    @staticmethod
+    def from_dict(d: dict[str, Any]) -> ExperimentDBConfig:
+        if "enabled" in d:
+            raise ValueError("experiment_db.enabled was removed: the experiment DB is always on")
+        unknown = set(d) - {"results_dir", "diagnostics_max_batches"}
+        if unknown:
+            raise ValueError(f"unknown experiment_db keys: {sorted(unknown)}")
+        return ExperimentDBConfig(
+            results_dir=str(d.get("results_dir", DEFAULT_RESULTS_DIR)),
+            diagnostics_max_batches=int(d.get("diagnostics_max_batches", 15)),
+        )
+
+
 def dataset_num_classes(name: str) -> int:
     n = name.lower()
     if n in ("cifar10", "fake", "synthetic", "debug", "random"):
@@ -98,9 +125,9 @@ class ExperimentConfig:
     compression: CompressionConfig = field(default_factory=CompressionConfig)
     compression_order: list[str] = field(default_factory=lambda: ["distill", "prune", "quantize"])
     hardware_profile: str = "laptop_cpu"
-    benchmark: dict[str, Any] = field(default_factory=dict)
+    benchmark: BenchmarkConfig = field(default_factory=BenchmarkConfig)
     train: dict[str, Any] = field(default_factory=dict)
-    experiment_db: dict[str, Any] = field(default_factory=dict)
+    experiment_db: ExperimentDBConfig = field(default_factory=ExperimentDBConfig)
 
     @property
     def num_classes(self) -> int:
@@ -131,10 +158,16 @@ class ExperimentConfig:
             compression=comp,
             compression_order=order,
             hardware_profile=str(d.get("hardware_profile", "laptop_cpu")),
-            benchmark=dict(d.get("benchmark") or {}),
+            benchmark=BenchmarkConfig.from_dict(dict(d.get("benchmark") or {})),
             train=dict(d.get("train") or {}),
-            experiment_db=dict(d.get("experiment_db") or {}),
+            experiment_db=ExperimentDBConfig.from_dict(dict(d.get("experiment_db") or {})),
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Plain-YAML view of the resolved config (stored with every run)."""
+        d = asdict(self)
+        d["benchmark"] = self.benchmark.to_dict()
+        return d
 
 
 @dataclass

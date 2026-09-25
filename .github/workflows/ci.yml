@@ -1,12 +1,52 @@
 name: CI
 
 on:
-  push:
-    branches: [main, master]
+  push:  # every branch: phase branches are stacked and reviewed before merge
   pull_request:
 
 jobs:
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest: x86-64 (AVX2 kernel paths); macos-14: Apple Silicon (NEON paths).
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -e ".[dev,kernels,export]"
+      - name: Build C++ kernels
+        run: scripts/build_kernels.sh
+      - name: Ruff (lint)
+        run: ruff check .
+      - name: Ruff (format)
+        run: ruff format --check .
+      - name: Pytest
+        env:
+          EDGEAI_REQUIRE_KERNELS: "1"
+        run: |
+          python -c "from edge_ai_compression.inference import kernels; print('ISAs:', kernels.supported_isas())"
+          pytest -q
+      - name: Smoke experiments (offline, synthetic data)
+        run: |
+          python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
+          python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_benchmark.yml
+          python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_inference.yml
+          python run_kernel_study.py --config edge_ai_compression/configs/studies/smoke_kernel_study.yml
+
+  avx512-emulated:
+    # GitHub's x86 runners usually lack AVX-512. Intel SDE emulates a Sapphire
+    # Rapids CPU so the AVX-512 kernel paths are correctness-tested (never
+    # benchmarked: emulation timing is meaningless). Using SDE means accepting
+    # Intel's SDE license, so the job only runs once the repository variable
+    # ENABLE_SDE is set to "true".
+    if: vars.ENABLE_SDE == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,12 +56,17 @@ jobs:
       - name: Install
         run: |
           python -m pip install -U pip
-          pip install -e ".[dev]"
-      - name: Ruff (lint)
-        run: ruff check .
-      - name: Ruff (format)
-        run: ruff format --check .
-      - name: Pytest
-        run: pytest -q
-      - name: Smoke experiment (offline, synthetic data)
-        run: python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
+          pip install -e ".[dev,kernels]"
+      - name: Build C++ kernels
+        run: scripts/build_kernels.sh
+      - name: Set up Intel SDE
+        uses: petarpetrovt/setup-sde@6d2773bc0ef3005fd52e0ae0bb91782321793aec  # v6.0
+        with:
+          environmentVariableName: SDE_PATH
+          sdeVersion: 10.13.1
+      - name: AVX-512 kernel tests under SDE (-spr)
+        env:
+          EDGEAI_REQUIRE_KERNELS: "1"
+        run: |
+          "$SDE_PATH/sde64" -spr -- python -c "from edge_ai_compression.inference import kernels as k; i = k.supported_isas(); print(i); assert 'avx512' in i"
+          "$SDE_PATH/sde64" -spr -- python -m pytest -q tests/test_kernels.py -k avx512
