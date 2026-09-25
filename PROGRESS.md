@@ -47,10 +47,19 @@ Resume point for autonomous work. Updated after every commit.
 - Ladder: `sweeps/prune_ladder_resnet18_cifar10.yml` (39 runs). Docs: docs/pruning.md.
 - Results PENDING (NEEDS ESHAAN 7).
 
-### Next: Phase 5 (pre-training variants + signal logging), branch `phase5-pretraining`
-Plan into DECISIONS: trainer variants (fake-quant noise / QAT-from-scratch, RigL dynamic sparsity,
-kurtosis regularizer); signal logging every N steps (weight kurtosis, activation outliers, Hutchinson
-trace, SAM sharpness, weight norms) into the DB; scaling configs (ResNet widths/depths, ViT sizes).
+### Phase 5 (pre-training variants + signals): COMPLETE, pushed on `phase5-pretraining`
+- ResNet family resnet{10,18,34}_w{0.25,0.5,1.0}_cifar; signals.py (kurtosis, outliers, Hessian
+  trace, sharpness, ...) logged to training_signals.csv; variants quant_noise / kurtosis / rigl;
+  training sweeps (`kind: train`, path templates); tracks pretrain_variants/scaling/length/vit.
+- Fixes: circular import (also patched on phase4-pruning, 6bab7ac), strict experiment keys (D5.3).
+- Docs: docs/pretraining.md. Results PENDING (NEEDS ESHAAN 8).
+
+### Next: Phase 6 (full studies + analysis), branch `phase6-studies`
+Plan into DECISIONS: (a) compression targets per checkpoint (PTQ/prune applied to every logged
+checkpoint -> post-compression accuracy), (b) early-predictability surrogates (RF/MLP/GP + GBM) vs k,
+(c) signal ablations, (d) scaling-curve fits, (e) latency-proxy study (FLOPs/params/sparsity vs
+measured latency + learned proxy), (f) Pareto frontiers; figures regenerated from the DB by
+`reproduce.sh`.
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
@@ -88,3 +97,6 @@ trace, SAM sharpness, weight norms) into the DB; scaling configs (ResNet widths/
    `python launch_sweep.py --config edge_ai_compression/configs/sweeps/ptq_validation_imagenet.yml --set device=cuda`.
 7. **Phase 4 pruning ladder:** `notebooks/tracks.ipynb`, resnet18_prune cells (reuses the Phase 3
    ResNet-18 checkpoints; trains them if missing).
+8. **Phase 5 training tracks:** `notebooks/tracks.ipynb` cells for pretrain_variants (15 runs),
+   pretrain_scaling (30), pretrain_length (9), pretrain_vit (9). These produce the checkpoints and
+   signals Phase 6 analyzes.

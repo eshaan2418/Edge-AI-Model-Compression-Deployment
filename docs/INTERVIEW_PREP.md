@@ -123,3 +123,27 @@ Any "sparsity vs latency" analysis has to use the measured number, or it attribu
 
 **5. How do you make "fine-tune vs LoRA recovery" a fair comparison?**
 Both get the same budget: the same epochs, learning-rate schedule and data, starting from the same pruned weights, and the same 3 training seeds. The result is a trade-off, not a single winner: LoRA trains about 1–5% of the parameters (so it fits in less memory and each step's weight update is cheaper), while full fine-tuning can move every surviving weight. I report accuracy recovered per trainable parameter as well as absolute accuracy.
+
+---
+
+## Phase 5: pre-training variants + signals
+
+**1. What does Quant-Noise do that QAT doesn't, and why is it off in eval mode?**
+QAT fake-quantizes every weight on every forward pass. Quant-Noise quantizes a random subset (fraction p), so gradients through the unquantized weights stay unbiased, while the network still learns to tolerate quantization error. p = 1 recovers QAT from scratch, so one knob spans the family. It's switched off in eval because signals, checkpoints and downstream PTQ should see the clean float weights. The question is whether training *with* noise yields weights that quantize better *afterwards*, not what the noisy network's accuracy is.
+
+**2. RigL needs the gradient of weights that are currently zero. How do you get it, and what breaks if you use a mask parametrization?**
+If the forward pass computes W ⊙ M, autograd gives ∂L/∂W ⊙ M, which is zero at every inactive position, so there's nothing to grow from. I run the forward pass on the dense weight tensor, where inactive entries are simply zero. Then ∂L/∂W is dense, and the growth step can pick the inactive connections with the largest gradient magnitude. The cost is that the optimizer also updates inactive weights, so I re-zero them, and their momentum/Adam state, after every step. A test checks that zeros, per-layer density and momentum masking all hold.
+
+**3. Why measure signals on a training batch rather than the test set?**
+Phase 6 uses these signals to predict final post-compression *test* accuracy. Signals computed from test data, especially the loss-based ones (Hessian trace, sharpness, probe loss), would leak test information into the predictor's features and inflate its apparent quality. So a probe batch is drawn once from the training data and frozen, which keeps the signals comparable across steps and runs.
+
+**4. Sharpness here is L(w + ρ g/‖g‖) − L(w). What does it approximate, and what are its limitations?**
+It's the first-order solution of SAM's inner problem, max over ‖ε‖ ≤ ρ of L(w + ε), which is ε* ≈ ρ·g/‖g‖. It's cheap (one extra forward and backward pass) and bounds how much the loss can rise under a weight perturbation of size ρ. That's a direct proxy for quantization noise, which is a weight perturbation. Limitations:
+- It isn't invariant to layer-wise rescaling of ReLU networks (Dinh et al. 2017), and BN makes that worse.
+- First order only.
+- A single ρ.
+
+That's why I also log the Hessian trace and weight kurtosis, and Phase 6's ablations measure which signal actually carries predictive information.
+
+**5. How do you scale "training length" properly, and why not just use intermediate checkpoints?**
+An intermediate checkpoint of a 90-epoch cosine run at epoch 30 has a high learning rate and hasn't annealed. It isn't the model you'd get by training for 30 epochs. So the length sweep trains separate 10, 30 and 90-epoch runs, each with its own full schedule. Intermediate checkpoints serve a different purpose: the early-prediction features, where "what does this run look like at step k" is exactly the question.
