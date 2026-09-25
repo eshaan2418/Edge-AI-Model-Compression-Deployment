@@ -8,11 +8,11 @@ Artifacts produced by the scripts:
 
 | File / dir | Produced by | Framework |
 |---|---|---|
-| `baseline_resnet18.pt` | `python train.py` / `mc train` | PyTorch |
+| `baseline_resnet18.pt` | `python -m legacy.model_compression.cli train` | PyTorch |
 | `compressed.pt` | `python run_experiment.py ...` | PyTorch |
-| `baseline_model/` (SavedModel) | `python train_baseline.py` | TensorFlow |
-| `quantized_dynamic_range.tflite` | `python quantize_model.py` | TensorFlow |
-| `quantized_integer_only.tflite` | `python quantize_model.py` | TensorFlow |
-| `student_model/` (SavedModel) | `python distill_model.py` | TensorFlow |
+| `baseline_model/` (SavedModel) | `python legacy/tflite/train_baseline.py` | TensorFlow |
+| `quantized_dynamic_range.tflite` | `python legacy/tflite/quantize_model.py` | TensorFlow |
+| `quantized_integer_only.tflite` | `python legacy/tflite/quantize_model.py` | TensorFlow |
+| `student_model/` (SavedModel) | `python legacy/tflite/distill_model.py` | TensorFlow |
 
 Delete anything here freely; it is all regenerable.

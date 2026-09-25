@@ -79,7 +79,7 @@ def write_artifacts(
     else:
         tflite_path.write_text(
             "TFLite export requires TensorFlow conversion from ONNX or SavedModel; "
-            "see legacy quantize_model.py for the Keras/TFLite path.\n",
+            "see legacy/tflite/quantize_model.py for the Keras/TFLite path.\n",
             encoding="utf-8",
         )
 

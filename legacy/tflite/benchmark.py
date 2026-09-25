@@ -15,7 +15,7 @@ from memory_profiler import memory_usage  # noqa: E402
 # Default model to benchmark; override with --model-path.
 DEFAULT_MODEL_PATH = "models/baseline_model"
 DEFAULT_NUM_LATENCY_TESTS = 200
-RESULTS_FILE = "benchmark_results.md"
+RESULTS_FILE = "legacy/tflite/benchmark_results.md"
 
 
 # ... all helper functions remain unchanged ...

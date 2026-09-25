@@ -5,4 +5,4 @@ def test_imports():
     import_module("edge_ai_compression.core.pipeline")
     import_module("edge_ai_compression.core.runner")
     import_module("edge_ai_compression.optimization.search.bayesian_search")
-    import_module("src.model_compression.datasets")
+    import_module("legacy.model_compression.datasets")

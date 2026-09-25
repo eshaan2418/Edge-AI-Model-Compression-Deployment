@@ -1,9 +1,10 @@
 # Dependencies are declared in pyproject.toml (single source of truth).
 # This file installs the PyTorch framework plus the test/lint tooling — enough
-# to run `pytest` and every entrypoint under edge_ai_compression/ and src/.
+# to run `pytest`, every entrypoint under edge_ai_compression/, and the legacy
+# PyTorch CLI in legacy/model_compression/.
 #
-# For the original TensorFlow/Keras scripts (train_baseline.py, benchmark.py,
-# quantize_model.py, distill_model.py) also install the `tf` extra:
+# For the legacy TensorFlow/Keras scripts in legacy/tflite/ (train_baseline.py,
+# benchmark.py, quantize_model.py, distill_model.py) also install the `tf` extra:
 #     pip install -e ".[tf]"       # TensorFlow + Keras
 #     pip install -e ".[tf-mot]"   # adds the pruning toolkit for prune_model.py
 # For plotting: pip install -e ".[viz]"
