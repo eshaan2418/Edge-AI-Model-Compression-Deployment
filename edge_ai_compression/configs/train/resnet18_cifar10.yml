@@ -1,0 +1,19 @@
+# ResNet-18 (CIFAR variant) on CIFAR-10: the baseline for the Phase 3 PTQ/QAT ladder.
+# Standard recipe: SGD(0.9, nesterov), lr 0.1 cosine with 1 warmup epoch, wd 5e-4
+# (not on BN/bias), batch 128, crop+flip augmentation. Run once per seed (0, 1, 2).
+# device: mps (Apple GPU) or cuda (Colab/Kaggle); cpu works but is slow.
+model: resnet18_cifar
+dataset: cifar10
+data_dir: data
+batch_size: 128
+num_workers: 4
+device: mps
+seed: 0
+epochs: 60
+lr: 0.1
+warmup_epochs: 1
+schedule: cosine
+num_checkpoints: 12
+checkpoint_dir: models/checkpoints
+results_dir: results
+log_every_steps: 100

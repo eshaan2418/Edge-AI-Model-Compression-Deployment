@@ -115,3 +115,33 @@ decided, alternatives considered, and why.
 ### D2.5 AVX-512 correctness via Intel SDE, gated on a repo variable
 - **Why:** GitHub's x86 runners usually lack AVX-512, so the AVX-512 kernels would never execute in CI. Intel SDE emulates a Sapphire Rapids CPU. The action is pinned by commit SHA (it vendors the SDE binaries).
 - **Gate:** using SDE means accepting Intel's license, which is the repo owner's decision, so the job runs only when `vars.ENABLE_SDE == 'true'` (see PROGRESS "NEEDS ESHAAN").
+
+---
+
+## Phase 3: PTQ / QAT ladder
+
+### Plan (self-approved)
+All methods quantize a **BN-folded** model (conv bias absorbs BN) into `QuantConv2d` / `QuantLinear` wrappers holding a weight quantizer (bits, granularity, scale, rounding) and an optional static activation quantizer. Accuracy is measured by simulation (fake-quant in float), and int8 / int4 models lower to the C++ engine for latency with the *same* integer weights and scales.
+
+| Rung | Method | Reference |
+|---|---|---|
+| 1 | RTN weights, per-tensor and per-channel, 8/4 bits | baseline |
+| 2 | Static W8A8 with activation calibration: min-max, percentile, MSE-optimal clipping | Krishnamoorthi 2018; Nagel et al. 2021 (white paper) |
+| 3 | AdaRound: learned up/down rounding per weight, layer-wise output reconstruction | Nagel et al., ICML 2020 |
+| 4 | BRECQ: block-wise (residual block) reconstruction with AdaRound rounding | Li et al., ICLR 2021 |
+| 5 | QAT fine-tuning with LSQ learnable step sizes and STE | Esser et al., ICLR 2020 |
+| 6 | HAWQ-style mixed precision: Hutchinson Hessian trace per layer → sensitivity × quant error → knapsack bit allocation {4, 8} under a size budget | Dong et al., HAWQ-V2 (NeurIPS 2020) |
+| 7 | int4 weight-only, group-wise RTN (and AdaRound) | — |
+| 8 | SmoothQuant for a small ViT: migrate activation outliers into weights before W8A8 | Xiao et al., ICML 2023 |
+
+### D3.1 Build the supervised trainer now (`pretraining/`), not in Phase 5
+- **Why:** the ladder needs trained baselines, and QAT needs a training loop; the framework had only a KD trainer. Phase 5 extends this trainer (compression-aware variants, signal logging) instead of adding a parallel one.
+
+### D3.2 Simulated quantization + own kernels, not `torch.ao` quantized modules
+- **Why:** torch 2.14 deprecates quantized tensor dtypes (D1.14). Fake-quant simulation is backend-independent and differentiable (needed by AdaRound/BRECQ/QAT). Deployment latency comes from the C++ engine, which consumes the same integer weights and scales.
+
+### D3.3 Validation against papers: qualitative on CIFAR; ImageNet check needs data we don't have
+- AdaRound / BRECQ / HAWQ report ImageNet numbers for torchvision ResNet-18/50. ImageNet validation requires a manual, license-gated download. We validate the *ordering* the papers report (at 4-bit weights: RTN ≪ AdaRound ≤ BRECQ; W8A8 ≈ FP) on CIFAR-10/100 and document the gap. An ImageNet validation config is provided for when the data is available (NEEDS ESHAAN).
+
+### D3.4 No hyper-parameter tuning on the test set
+- `build_loaders` has no validation split. Calibration uses training images; any tuned knob (percentile, λ, iterations) is set from the papers' defaults or on a held-out slice of the training set, never the test set.
