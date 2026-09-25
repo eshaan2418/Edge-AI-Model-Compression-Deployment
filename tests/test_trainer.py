@@ -29,7 +29,7 @@ def test_config_rejects_unknown_keys_and_variants():
     with pytest.raises(ValueError, match="unknown train keys"):
         TrainConfig.from_dict({"epochz": 1})
     with pytest.raises(ValueError, match="variant"):
-        TrainConfig.from_dict({"variant": "rigl"})
+        TrainConfig.from_dict({"variant": "movement"})
     assert TrainConfig.from_dict({"limit_samples": "16"}).limit_samples == 16
 
 
