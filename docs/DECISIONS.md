@@ -224,3 +224,31 @@ Rows go to `training_signals.csv` (run id, step, scalar summaries), with per-lay
 
 ### D5.4 Training sweeps (`kind: train`) with path templates
 - A grid of seeds × variants needs distinct checkpoint paths. Top-level string values are formatted with the merged config (`models/pretrain/{model}_{variant}_e{epochs}_s{seed}.pt`), and the config test asserts no two runs in a training sweep share an export path.
+
+---
+
+## Phase 6: studies + analysis
+
+### Plan (self-approved)
+1. **Compression targets** (`experiments/compress_runs.py`, track `targets`): every Phase 5 training run's final checkpoint goes through a fixed panel of training-free compressions:
+   - RTN W8A8
+   - RTN W4A8
+   - W4 weight-only (group 32)
+   - 2:4 without recovery
+   - 50% and 80% unstructured without recovery
+
+   The per-method accuracy drop is the *compressibility* target. The same panel on intermediate checkpoints gives compressibility-over-training curves. Rows carry `source_run_id` / `source_step` (schema v5) so experiments join to training runs and signals.
+2. **Early predictability** (`analysis/early_prediction.py`): features are signals at training fraction f ∈ {0, 0.01, 0.03, 0.1, 0.3, 1.0} (nearest logged step), plus log(params) and a variant one-hot. The target is the final model's accuracy drop under method M. Predictors: RF, MLP, GP (existing surrogates) and gradient boosting, against two baselines (predict the mean; params-only). Evaluation is **grouped cross-validation, leaving out one (model, variant) configuration** (all seeds together), so a predictor must generalize to unseen configurations. Metrics: Spearman ρ, R², MAE, each with bootstrap CIs over held-out predictions, plotted against f.
+3. **Signal ablations:** single-group and drop-one-group feature sets (weight statistics, activation outliers, curvature, sharpness) at each f.
+4. **Scaling curves** (`analysis/scaling.py`): accuracy drop vs parameter count and vs training epochs. Fit drop = a·N^(−b) + c with scipy `curve_fit`; bootstrap CIs over seeds for the exponent b. A fit that's no better than a constant is reported as such.
+5. **Latency-proxy study** (`analysis/latency_proxy.py`):
+   - rank correlation of FLOPs, parameters and measured sparsity with measured latency, per backend and machine
+   - a learned per-layer latency model (gradient boosting on (op, log M, log N, log K, sparsity)) trained on `kernel_benchmarks` rows and summed over a model's layers, evaluated leave-one-model-out against measured end-to-end latency
+6. **Pareto frontiers** (`analysis/pareto_report.py`): accuracy × latency × size (× energy once measured), per fingerprint, via the existing `ParetoOptimizer`.
+7. **`reproduce.sh`:** regenerates every figure and table under `results/figures/` from the experiment DB. No number enters docs or the paper any other way.
+
+### D6.1 Leave-one-configuration-out, not random K-fold
+- Seeds of the same configuration are near-duplicates. Random folds would put a configuration's seeds on both sides of the split and measure memorization, not prediction. Grouping by (model, variant) asks the real question: can training-time signals predict compressibility for a configuration never seen before?
+
+### D6.2 Analyses are validated on synthetic DBs with known ground truth
+- Before real data exists, each analysis is tested on a synthetic experiment DB where the answer is known: a planted signal–target relationship, a planted power law, a planted latency model. The tests assert the pipeline recovers it. This checks the analysis code, not any scientific claim.

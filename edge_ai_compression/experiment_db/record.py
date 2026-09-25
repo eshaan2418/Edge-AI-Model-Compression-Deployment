@@ -6,7 +6,7 @@ from typing import Any
 
 from edge_ai_compression.benchmarking.report import BenchmarkReport
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 @dataclass
@@ -24,6 +24,8 @@ class ExperimentRecord:
     git_commit: str | None
     git_dirty: bool | None
     fingerprint_hash: str
+    source_run_id: str | None  # training run the checkpoint came from (if known)
+    source_step: int | None  # training step of that checkpoint
     model_name: str
     dataset: str
     num_params: int
@@ -96,6 +98,8 @@ def record_from_run(
     device: str,
     baseline_accuracy: float,
     report: BenchmarkReport,
+    source_run_id: str | None = None,
+    source_step: int | None = None,
     extra: dict[str, Any] | None = None,
 ) -> ExperimentRecord:
     lat = report.latency
@@ -108,6 +112,8 @@ def record_from_run(
         git_commit=report.fingerprint.git_commit,
         git_dirty=report.fingerprint.git_dirty,
         fingerprint_hash=report.fingerprint.hash,
+        source_run_id=source_run_id,
+        source_step=source_step,
         model_name=model_name,
         dataset=dataset,
         num_params=num_params,

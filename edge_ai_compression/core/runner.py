@@ -53,6 +53,8 @@ class ExperimentRunner:
         )
 
         model = ModelRegistry.create(cfg.model, num_classes=cfg.num_classes).to(cfg.device)
+        source_run_id: str | None = None
+        source_step: int | None = None
         if cfg.checkpoint_in:
             if not os.path.isfile(cfg.checkpoint_in):
                 raise FileNotFoundError(
@@ -61,6 +63,7 @@ class ExperimentRunner:
                 )
             ckpt = torch.load(cfg.checkpoint_in, map_location=cfg.device)
             model.load_state_dict(ckpt["model_state"])
+            source_run_id, source_step = ckpt.get("run_id"), ckpt.get("step")
 
         baseline_sd = _clone_state(model)
         # The baseline only contributes accuracy; its latency belongs to its own run.
@@ -142,6 +145,8 @@ class ExperimentRunner:
             device=f"{cfg.device}:{cfg.hardware_profile}",
             baseline_accuracy=baseline_acc,
             report=report,
+            source_run_id=source_run_id,
+            source_step=source_step,
             extra={"failure_shift": failure_shift},
         )
         append_csv_row(record, db.path)

@@ -70,7 +70,7 @@ def test_smoke_inference_config_records_backend(tmp_path):
     ExperimentRunner(ExperimentConfig.from_dict(raw)).run()
     with open(experiments_csv(tmp_path), newline="") as f:
         row = next(csv.DictReader(f))
-    assert row["backend"] == "edge_int8" and row["schema_version"] == "4"
+    assert row["backend"] == "edge_int8" and row["schema_version"] == "5"
 
 
 def test_unknown_top_level_key_raises():
