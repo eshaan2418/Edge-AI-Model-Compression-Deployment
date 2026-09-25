@@ -46,3 +46,10 @@ def test_study_configs_parse(path):
     cfg = load_yaml(path)
     assert set(cfg) <= STUDY_KEYS
     BenchmarkConfig.from_dict(cfg.get("benchmark") or {})
+
+
+@pytest.mark.parametrize("path", sorted((ROOT / "lm").glob("*.yml")), ids=str)
+def test_lm_pipeline_configs_parse(path):
+    from edge_ai_compression.lm.pipeline import PipelineConfig
+
+    PipelineConfig.from_dict(load_yaml(path))
