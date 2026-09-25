@@ -1,0 +1,22 @@
+# The Phase 3 ladder on ResNet-18 / CIFAR-10: 3 training seeds x 12 rungs = 36 runs.
+# Needs models/resnet18_cifar10_seed{0,1,2}.pt from configs/train/resnet18_cifar10.yml.
+# Reconstruction settings follow the papers except iterations (AdaRound used 10k-20k
+# per layer on ImageNet; 2k/5k here, CIFAR-scale), documented in docs/quantization.md.
+sweep_id: ptq_ladder_resnet18_cifar10
+base_config: edge_ai_compression/configs/experiments/ladder/resnet18_cifar10_base.yml
+axes:
+  - - {seed: 0, checkpoint_in: models/resnet18_cifar10_seed0.pt}
+    - {seed: 1, checkpoint_in: models/resnet18_cifar10_seed1.pt}
+    - {seed: 2, checkpoint_in: models/resnet18_cifar10_seed2.pt}
+  - - {compression_order_tag: baseline, compression: {quantization: {enabled: false}}, benchmark: {backend: edge_f32}}
+    - {compression: {quantization: {method: rtn, calibration: {method: minmax}}}}
+    - {compression: {quantization: {method: rtn, calibration: {method: percentile}}}}
+    - {compression: {quantization: {method: rtn, calibration: {method: mse}}}}
+    - {compression: {quantization: {method: rtn, granularity: per_tensor}}}
+    - {compression: {quantization: {method: rtn, weight_bits: 4}}}
+    - {compression: {quantization: {method: rtn, weight_bits: 4, act_bits: null, granularity: per_group, group_size: 32}}}
+    - {compression: {quantization: {method: adaround, weight_bits: 4, adaround: {iters: 2000, num_samples: 1024}}}}
+    - {compression: {quantization: {method: adaround, weight_bits: 4, act_bits: null, granularity: per_group, group_size: 32, adaround: {iters: 2000, num_samples: 1024}}}}
+    - {compression: {quantization: {method: brecq, weight_bits: 4, brecq: {iters: 5000, num_samples: 1024, fisher: true}}}}
+    - {compression: {quantization: {method: qat, weight_bits: 4, qat: {epochs: 3, lr: 0.001}}}}
+    - {compression: {quantization: {method: hawq, hawq: {avg_bits: 6.0, candidate_bits: [4, 8], hutchinson_samples: 512}}}}

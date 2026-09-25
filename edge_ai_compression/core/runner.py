@@ -136,7 +136,7 @@ class ExperimentRunner:
             compression_order=applied_order,
             pruning_type=pruning_type,
             pruning_sparsity=pruning_sparsity,
-            quantization_type=cfg.compression.quantization.mode
+            quantization_type=cfg.compression.quantization.tag
             if cfg.compression.quantization.enabled
             else "none",
             distillation_enabled=cfg.compression.distillation.enabled,

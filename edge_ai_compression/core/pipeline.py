@@ -5,7 +5,11 @@ from typing import TYPE_CHECKING, Any
 
 import torch.nn as nn
 
-from edge_ai_compression.core.experiment import CompressionConfig, PruningSection
+from edge_ai_compression.core.experiment import (
+    CompressionConfig,
+    PruningSection,
+    QuantizationSection,
+)
 
 if TYPE_CHECKING:
     from torch.utils.data import DataLoader
@@ -51,18 +55,14 @@ class PruningStage(CompressionStage):
 
 
 class QuantizationStage(CompressionStage):
-    def __init__(self, mode: str = "dynamic_linear") -> None:
-        from edge_ai_compression.compression.quantization.dynamic import (
-            dynamic_quantize_linear_layers,
-        )
-
-        self.mode = mode
-        self._quantize = dynamic_quantize_linear_layers
+    def __init__(self, section: QuantizationSection) -> None:
+        self.section = section
+        self.device: str = "cpu"
 
     def apply(self, model: nn.Module, data: Any) -> nn.Module:
-        if self.mode != "dynamic_linear":
-            raise ValueError(f"Unsupported quantization mode: {self.mode}")
-        return self._quantize(model)
+        from edge_ai_compression.compression.quantization.ptq import run_quantization
+
+        return run_quantization(model, self.section, data, self.device)
 
 
 class DistillationStage(CompressionStage):
@@ -144,7 +144,7 @@ def build_stages_for_order(
         elif name == "prune":
             stages.append(PruningStage(cfg.pruning))
         elif name == "quantize":
-            stages.append(QuantizationStage(mode=cfg.quantization.mode))
+            stages.append(QuantizationStage(cfg.quantization))
     return stages
 
 
@@ -172,5 +172,7 @@ class CompressionPipeline:
             if isinstance(stage, PruningStage):
                 stage.device = device
                 stage.baseline_accuracy = baseline_accuracy
+            if isinstance(stage, QuantizationStage):
+                stage.device = device
             model = stage.apply(model, data)
         return model

@@ -1,0 +1,37 @@
+# ImageNet validation of the ladder against the papers (DECISIONS D3.3). Needs
+# ImageNet-1k in ImageFolder layout under data/imagenet/{train,val} (license-gated)
+# and downloads torchvision's pretrained weights. Settings mirror the papers:
+# 1024 calibration images from the train split, first/last layer 8-bit, W4A32 for
+# the weight-rounding comparisons. Accuracy is simulated (torch_eager, GPU OK).
+model: resnet18_imagenet_tv
+dataset: imagenet
+data_dir: data
+batch_size: 128
+num_workers: 8
+device: cuda
+seed: 0
+checkpoint_out: models/imagenet_ladder_last.pt
+compression_order_tag: quantize
+compression:
+  pruning: {enabled: false}
+  distillation: {enabled: false}
+  quantization:
+    enabled: true
+    method: rtn
+    weight_bits: 4
+    act_bits: null
+    granularity: per_channel
+    first_last_bits: 8
+    calibration: {method: minmax, num_samples: 1024}
+benchmark:
+  backend: torch_eager
+  batch_size: 1
+  num_threads: 4
+  warmup_iters: 2
+  min_warmup_s: 0.0
+  iters: 5
+  process_repeats: 1
+  strict_environment: false
+experiment_db:
+  results_dir: results
+  diagnostics_max_batches: 10

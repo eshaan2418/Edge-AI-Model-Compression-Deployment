@@ -11,10 +11,11 @@ _STATS = {
     "cifar100": ((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762)),
     "tiny_imagenet": ((0.4802, 0.4481, 0.3975), (0.2770, 0.2691, 0.2821)),
     "fake": ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
+    "imagenet": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
 }
 
 # Number of image classes per supported dataset.
-_NUM_CLASSES = {"cifar10": 10, "cifar100": 100, "tiny_imagenet": 200, "fake": 10}
+_NUM_CLASSES = {"cifar10": 10, "cifar100": 100, "tiny_imagenet": 200, "fake": 10, "imagenet": 1000}
 
 # Default number of synthetic samples per split when no ``limit_samples`` given.
 _FAKE_DEFAULT_SAMPLES = 128
@@ -83,6 +84,30 @@ def build_loaders(
         test_ds = torchvision.datasets.FakeData(
             size=n, image_size=(3, 32, 32), num_classes=10, transform=test_tf
         )
+    elif name == "imagenet":
+        # ImageNet-1k in ImageFolder layout: {data_dir}/imagenet/{train,val}/<wnid>/*.JPEG.
+        # Standard eval transform (resize 256, center crop 224) for both splits: the
+        # train split is only used for PTQ calibration here, as in AdaRound/BRECQ.
+        import os
+
+        root = os.path.join(data_dir, "imagenet")
+        for split in ("train", "val"):
+            if not os.path.isdir(os.path.join(root, split)):
+                raise FileNotFoundError(
+                    f"ImageNet needs {root}/{split}/<class>/*.JPEG (ImageFolder layout); "
+                    "it is license-gated and not downloaded automatically"
+                )
+        mean, std = _STATS[name]
+        eval_tf = transforms.Compose(
+            [
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean, std),
+            ]
+        )
+        train_ds = torchvision.datasets.ImageFolder(os.path.join(root, "train"), transform=eval_tf)
+        test_ds = torchvision.datasets.ImageFolder(os.path.join(root, "val"), transform=eval_tf)
     elif name == "tiny_imagenet":
         train_tf, test_tf = _transforms(name, crop_size=64)
         import os

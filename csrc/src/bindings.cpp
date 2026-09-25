@@ -251,7 +251,7 @@ NB_MODULE(_C, m) {
          nb::ndarray<int8_t, nb::c_contig, nb::device::cpu> out) {
         require(scale > 0, "scale must be positive");
         require(x.size() == out.size(), "out must have the same size as x");
-        quantize_s8(x.data(), x.size(), 1.0f / scale, out.data());
+        quantize_s8(x.data(), x.size(), scale, out.data());
       },
       nb::arg("x").noconvert(), nb::arg("scale"), nb::arg("out").noconvert());
   m.def(

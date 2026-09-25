@@ -15,6 +15,7 @@ BACKENDS = (
     "edge_w4",
     "edge_sparse24",
     "edge_csr",
+    "edge_quant",
 )
 
 RENAMED_KEYS = {

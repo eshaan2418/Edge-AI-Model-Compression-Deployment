@@ -115,3 +115,50 @@ decided, alternatives considered, and why.
 ### D2.5 AVX-512 correctness via Intel SDE, gated on a repo variable
 - **Why:** GitHub's x86 runners usually lack AVX-512, so the AVX-512 kernels would never execute in CI. Intel SDE emulates a Sapphire Rapids CPU. The action is pinned by commit SHA (it vendors the SDE binaries).
 - **Gate:** using SDE means accepting Intel's license, which is the repo owner's decision, so the job runs only when `vars.ENABLE_SDE == 'true'` (see PROGRESS "NEEDS ESHAAN").
+
+---
+
+## Phase 3: PTQ / QAT ladder
+
+### Plan (self-approved)
+All methods quantize a **BN-folded** model (conv bias absorbs BN) into `QuantConv2d` / `QuantLinear` wrappers holding a weight quantizer (bits, granularity, scale, rounding) and an optional static activation quantizer. Accuracy is measured by simulation (fake-quant in float), and int8 / int4 models lower to the C++ engine for latency with the *same* integer weights and scales.
+
+| Rung | Method | Reference |
+|---|---|---|
+| 1 | RTN weights, per-tensor and per-channel, 8/4 bits | baseline |
+| 2 | Static W8A8 with activation calibration: min-max, percentile, MSE-optimal clipping | Krishnamoorthi 2018; Nagel et al. 2021 (white paper) |
+| 3 | AdaRound: learned up/down rounding per weight, layer-wise output reconstruction | Nagel et al., ICML 2020 |
+| 4 | BRECQ: block-wise (residual block) reconstruction with AdaRound rounding | Li et al., ICLR 2021 |
+| 5 | QAT fine-tuning with LSQ learnable step sizes and STE | Esser et al., ICLR 2020 |
+| 6 | HAWQ-style mixed precision: Hutchinson Hessian trace per layer → sensitivity × quant error → knapsack bit allocation {4, 8} under a size budget | Dong et al., HAWQ-V2 (NeurIPS 2020) |
+| 7 | int4 weight-only, group-wise RTN (and AdaRound) | — |
+| 8 | SmoothQuant for a small ViT: migrate activation outliers into weights before W8A8 | Xiao et al., ICML 2023 |
+
+### D3.1 Build the supervised trainer now (`pretraining/`), not in Phase 5
+- **Why:** the ladder needs trained baselines, and QAT needs a training loop; the framework had only a KD trainer. Phase 5 extends this trainer (compression-aware variants, signal logging) instead of adding a parallel one.
+
+### D3.2 Simulated quantization + own kernels, not `torch.ao` quantized modules
+- **Why:** torch 2.14 deprecates quantized tensor dtypes (D1.14). Fake-quant simulation is backend-independent and differentiable (needed by AdaRound/BRECQ/QAT). Deployment latency comes from the C++ engine, which consumes the same integer weights and scales.
+
+### D3.3 Validation against papers: qualitative on CIFAR; ImageNet check needs data we don't have
+- AdaRound / BRECQ / HAWQ report ImageNet numbers for torchvision ResNet-18/50. ImageNet validation requires a manual, license-gated download. We validate the *ordering* the papers report (at 4-bit weights: RTN ≪ AdaRound ≤ BRECQ; W8A8 ≈ FP) on CIFAR-10/100 and document the gap. An ImageNet validation config is provided for when the data is available (NEEDS ESHAAN).
+
+### D3.4 No hyper-parameter tuning on the test set
+- `build_loaders` has no validation split. Calibration uses training images; any tuned knob (percentile, λ, iterations) is set from the papers' defaults or on a held-out slice of the training set, never the test set.
+
+### D3.5 Removed the torch.ao dynamic-quantization path
+- `compression/quantization/dynamic.py`, `utils/quant_engine.py` and the `quantization.mode: dynamic_linear` key are gone (the key now raises). Quantization is always the simulated ladder (`method: rtn | ...`), and deployment goes through `edge_quant`.
+
+### D3.6 Engine vs simulation: exact per layer, not bit-identical end to end
+- **Finding:** C++ `quantize_s8` multiplied by `1/scale` while the simulation divides. Last-bit differences flipped rounding ties, and a W8A8 ResNet-18 differed by 1.6% relative at the logits. Fixed: the kernel now divides.
+- **Remaining, intrinsic:** the engine accumulates exactly in int32 and rescales once; the simulation accumulates dequantized products in fp32. Those differ at ~1e-7, which occasionally flips a value sitting exactly on a rounding boundary at the next layer's input quantization. One-step differences then compound in a deep net (about 1% at the logits for a random-weight ResNet-18). The same happens between any two correct int8 implementations.
+- **Test contract:** given identical inputs, every lowered layer matches its simulated layer to 1e-5 relative; end to end, relative error < 5% with identical argmax. Accuracy numbers are always measured with the backend that is benchmarked.
+
+### D3.7 QAT keeps BatchNorm folded
+- **Alternatives:** keep BN unfolded during QAT and fold at the end, freezing BN statistics after a few epochs (Krishnamoorthi 2018; Jacob et al. 2018).
+- **Why:** starting from the calibrated, BN-folded PTQ model keeps one model representation across the ladder and makes the QAT result directly lowerable to the engine. The cost is that the model can't re-estimate BN statistics under quantization noise. Fine for short fine-tunes; a limitation for long QAT.
+
+### D3.8 ViT track: three small ViTs; SmoothQuant only claimed if outliers exist
+- `vit_t_cifar` / `vit_s_cifar` / `vit_m_cifar` (patch 4, dims 128/256/384, depths 6/6/8), explicit `qkv`/`proj`/`fc1`/`fc2` linears so every projection is quantizable. Attention matmuls (QKᵀ, AV) stay in float: SmoothQuant's W8A8 targets the linear layers.
+- The C++ engine does not lower LayerNorm/GELU/attention, so ViT quantization is evaluated in simulation (accuracy). ViT latency comes from torch_eager/onnxruntime.
+- `smoothquant.outlier_stats` (max/median of per-channel activation maxima at LayerNorm-fed linears) is logged before SmoothQuant results are interpreted. Systematic outliers are reported at LLM scale (Dettmers et al. 2022); at CIFAR-ViT scale SmoothQuant may be a no-op, which would be reported as a negative result.

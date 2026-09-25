@@ -86,8 +86,9 @@ void im2col(const T* x, int C, int H, int W, int kh, int kw, int sh, int sw, int
             T* cols);
 int conv_out_size(int in, int k, int stride, int pad);
 
-// out = clamp(round_half_even(x * inv_scale), -127, 127)
-void quantize_s8(const float* x, size_t n, float inv_scale, int8_t* out);
+// out = clamp(round_half_even(x / scale), -127, 127). Divides (not multiplies by
+// 1/scale) so results are bit-identical to the PyTorch simulation and numpy.
+void quantize_s8(const float* x, size_t n, float scale, int8_t* out);
 float absmax(const float* x, size_t n);
 
 // ------------------------------------------------------ microbenchmarks ----

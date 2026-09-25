@@ -58,11 +58,11 @@ def test_process_repeats_are_independent_processes():
 
 
 def test_compressed_resnet_roundtrips_through_worker():
-    # Pruned + dynamically quantized models must survive torch.save -> fresh-process load.
+    # Pruned + quantized (simulated) models must survive torch.save -> fresh-process load.
     m = ModelRegistry.create("resnet18_cifar")
     cfg = CompressionConfig(
         pruning=PruningSection(enabled=True, amount=0.3),
-        quantization=QuantizationSection(enabled=True),
+        quantization=QuantizationSection(enabled=True, act_bits=None),
     )
     m = CompressionPipeline(cfg, order=["prune", "quantize"]).run(
         m, None, data_dir="data", batch_size=1, device="cpu"

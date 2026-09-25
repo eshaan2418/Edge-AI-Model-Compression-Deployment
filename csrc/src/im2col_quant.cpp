@@ -47,10 +47,10 @@ void im2col(const T* x, int C, int H, int W, int kh, int kw, int sh, int sw, int
 template void im2col<float>(const float*, int, int, int, int, int, int, int, int, int, float*);
 template void im2col<int8_t>(const int8_t*, int, int, int, int, int, int, int, int, int, int8_t*);
 
-void quantize_s8(const float* x, size_t n, float inv_scale, int8_t* out) {
+void quantize_s8(const float* x, size_t n, float scale, int8_t* out) {
   for (size_t i = 0; i < n; ++i) {
     // nearbyint uses the current rounding mode (round-half-even by default), like np.rint.
-    const float q = std::nearbyint(x[i] * inv_scale);
+    const float q = std::nearbyint(x[i] / scale);
     out[i] = static_cast<int8_t>(std::clamp(q, -127.0f, 127.0f));
   }
 }
