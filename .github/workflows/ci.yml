@@ -37,3 +37,4 @@ jobs:
         run: |
           python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
           python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_benchmark.yml
+          python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_inference.yml

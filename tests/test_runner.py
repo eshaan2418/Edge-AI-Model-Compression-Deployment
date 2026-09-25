@@ -55,3 +55,19 @@ def test_missing_checkpoint_is_an_error(tmp_path):
     raw["checkpoint_in"] = str(tmp_path / "does_not_exist.pt")
     with pytest.raises(FileNotFoundError, match="randomly initialized"):
         ExperimentRunner(ExperimentConfig.from_dict(raw)).run()
+
+
+def test_smoke_inference_config_records_backend(tmp_path):
+    from edge_ai_compression.inference import kernels
+
+    if not kernels.available() and not kernels.kernels_required():
+        pytest.skip("C++ kernels not built")
+    raw = load_experiment_config("edge_ai_compression/configs/experiments/smoke_inference.yml")
+    raw = raw.to_dict()
+    raw["experiment_db"]["results_dir"] = str(tmp_path)
+    raw["checkpoint_out"] = str(tmp_path / "model.pt")
+    raw["benchmark"]["process_repeats"] = 1
+    ExperimentRunner(ExperimentConfig.from_dict(raw)).run()
+    with open(experiments_csv(tmp_path), newline="") as f:
+        row = next(csv.DictReader(f))
+    assert row["backend"] == "edge_int8" and row["schema_version"] == "3"

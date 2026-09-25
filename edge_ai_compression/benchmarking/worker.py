@@ -5,7 +5,8 @@ by ``isolation.run_isolated``; not meant to be invoked by hand.
 
 Cold-start stages: ``startup`` (spawn + interpreter, up to the first line of
 this module), ``import`` (torch-free harness modules, which import numpy, plus
-``import torch``), ``load`` (torch.load), ``first_inference``. Nothing above
+``import torch``), ``load`` (backend import + artifact load + weight packing),
+``first_inference``. Nothing above
 ``T_START_NS`` may import torch.
 """
 
@@ -36,24 +37,24 @@ def main(argv: list[str]) -> None:
     cfg = BenchmarkConfig.from_dict(req["config"])
     apply_cpu_affinity(cfg.cpu_affinity)
 
+    import numpy as np
     import torch
-
-    from edge_ai_compression.utils.quant_engine import ensure_quantized_engine
 
     t_import = time.monotonic_ns()
     runtime_peak = peak_rss_bytes()
     torch.set_num_threads(cfg.num_threads)
-    ensure_quantized_engine()
 
-    model = torch.load(req["model_path"], map_location="cpu", weights_only=False)
-    model.eval()
+    from edge_ai_compression.inference.backends import get_backend
+    from edge_ai_compression.utils.quant_engine import ensure_quantized_engine
+
+    ensure_quantized_engine()
+    run = get_backend(cfg.backend).load(Path(req["model_path"]), cfg.num_threads)
     t_load = time.monotonic_ns()
 
-    gen = torch.Generator().manual_seed(0)
-    x = torch.randn(tuple(req["input_shape"]), generator=gen)
+    x = np.random.default_rng(0).standard_normal(tuple(req["input_shape"]), dtype=np.float32)
 
     def step() -> None:
-        model(x)
+        run(x)
 
     with torch.inference_mode():
         step()

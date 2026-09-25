@@ -6,7 +6,7 @@ from typing import Any
 
 from edge_ai_compression.benchmarking.report import BenchmarkReport
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 @dataclass
@@ -36,6 +36,7 @@ class ExperimentRecord:
     temperature: float
     alpha: float
     device: str
+    backend: str
     accuracy: float
     accuracy_drop: float
     latency_median: float
@@ -117,6 +118,7 @@ def record_from_run(
         temperature=temperature,
         alpha=alpha,
         device=device,
+        backend=cfg.backend,
         accuracy=report.accuracy,
         accuracy_drop=float(baseline_accuracy - report.accuracy),
         latency_median=report.latency_median_ms,

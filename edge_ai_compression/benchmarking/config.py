@@ -7,6 +7,16 @@ from typing import Any
 
 from edge_ai_compression.benchmarking.energy import METERS
 
+BACKENDS = (
+    "torch_eager",
+    "onnxruntime",
+    "edge_f32",
+    "edge_int8",
+    "edge_w4",
+    "edge_sparse24",
+    "edge_csr",
+)
+
 RENAMED_KEYS = {
     "latency_repeats": "iters",
     "latency_warmup": "warmup_iters",
@@ -28,6 +38,7 @@ class BenchmarkConfig:
     ``iters`` timed iterations (and for at least ``min_time_s``).
     """
 
+    backend: str = "torch_eager"
     batch_size: int = 1
     num_threads: int = 4
     warmup_iters: int = 50
@@ -40,6 +51,8 @@ class BenchmarkConfig:
     strict_environment: bool = True
 
     def __post_init__(self) -> None:
+        if self.backend not in BACKENDS:
+            raise ValueError(f"unknown benchmark.backend '{self.backend}'; expected {BACKENDS}")
         for name in ("batch_size", "num_threads", "iters", "process_repeats"):
             if getattr(self, name) < 1:
                 raise ValueError(f"benchmark.{name} must be >= 1")
@@ -74,6 +87,8 @@ class BenchmarkConfig:
         for name in ("min_warmup_s", "min_time_s"):
             if name in kwargs:
                 kwargs[name] = float(kwargs[name])
+        if "backend" in kwargs:
+            kwargs["backend"] = str(kwargs["backend"])
         if "energy_meter" in kwargs:
             kwargs["energy_meter"] = str(kwargs["energy_meter"])
         if "strict_environment" in kwargs:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import json
 import os
 import subprocess
@@ -13,7 +12,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-import torch
 import torch.nn as nn
 
 import edge_ai_compression
@@ -53,7 +51,7 @@ def run_isolated(
     *,
     timeout_s: float = 3600.0,
 ) -> ProcessResult:
-    """Benchmark a ``torch.save``-d model object in a new Python process."""
+    """Benchmark an exported artifact (see ``inference.backends``) in a new Python process."""
     with tempfile.TemporaryDirectory() as tmp:
         request, result = Path(tmp) / "request.json", Path(tmp) / "result.json"
         t_spawn = time.monotonic_ns()
@@ -98,8 +96,9 @@ def run_isolated(
 def benchmark_model(
     model: nn.Module, input_shape: tuple[int, ...], cfg: BenchmarkConfig
 ) -> list[ProcessResult]:
-    """Save ``model`` once, then run ``cfg.process_repeats`` independent processes."""
+    """Export ``model`` for ``cfg.backend`` once, then run ``cfg.process_repeats`` processes."""
+    from edge_ai_compression.inference.backends import get_backend
+
     with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / "model.pt"
-        torch.save(copy.deepcopy(model).cpu(), path)
+        path = get_backend(cfg.backend).export(model, input_shape, Path(tmp))
         return [run_isolated(path, input_shape, cfg) for _ in range(cfg.process_repeats)]
