@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, fields
 from typing import Any
 
+from edge_ai_compression.benchmarking.energy import METERS
+
 RENAMED_KEYS = {
     "latency_repeats": "iters",
     "latency_warmup": "warmup_iters",
@@ -44,6 +46,11 @@ class BenchmarkConfig:
         for name in ("warmup_iters", "min_warmup_s", "min_time_s"):
             if getattr(self, name) < 0:
                 raise ValueError(f"benchmark.{name} must be >= 0")
+        if self.energy_meter not in METERS:
+            raise ValueError(
+                f"unknown benchmark.energy_meter '{self.energy_meter}'; "
+                f"implemented: {sorted(METERS)}"
+            )
         if self.cpu_affinity is not None and not self.cpu_affinity:
             raise ValueError("benchmark.cpu_affinity must be omitted or non-empty")
 

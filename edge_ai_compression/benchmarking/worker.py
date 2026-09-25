@@ -20,11 +20,14 @@ import sys  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 from edge_ai_compression.benchmarking.config import BenchmarkConfig  # noqa: E402
+from edge_ai_compression.benchmarking.energy import get_meter  # noqa: E402
 from edge_ai_compression.benchmarking.memory import MIB, peak_rss_bytes  # noqa: E402
 from edge_ai_compression.benchmarking.timing import (  # noqa: E402
     apply_cpu_affinity,
     measure_latency,
 )
+
+ENERGY_DURATION_S = 10.0
 
 
 def main(argv: list[str]) -> None:
@@ -56,6 +59,7 @@ def main(argv: list[str]) -> None:
         step()
         t_first = time.monotonic_ns()
         trace = measure_latency(step, cfg)
+        energy = get_meter(cfg.energy_meter).joules_per_call(step, ENERGY_DURATION_S)
 
     peak = peak_rss_bytes()
     t_spawn = int(req["t_spawn_ns"])
@@ -70,6 +74,7 @@ def main(argv: list[str]) -> None:
         },
         "peak_rss_mib": peak / MIB,
         "model_peak_rss_mib": (peak - runtime_peak) / MIB,
+        "energy_j_per_inf": energy,
         "num_threads": torch.get_num_threads(),
     }
     result_path.write_text(json.dumps(result))

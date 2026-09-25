@@ -46,6 +46,7 @@ def test_isolated_run_reports_trace_stages_and_memory():
     assert r.stages_ms["cold_start"] == pytest.approx(parts, rel=1e-6)
     assert r.num_threads == 1
     assert r.peak_rss_mib > r.model_peak_rss_mib >= 0
+    assert r.energy_j_per_inf is None
 
 
 def test_process_repeats_are_independent_processes():

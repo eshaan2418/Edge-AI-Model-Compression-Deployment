@@ -29,6 +29,7 @@ class ProcessResult:
     stages_ms: dict[str, float]
     peak_rss_mib: float
     model_peak_rss_mib: float
+    energy_j_per_inf: float | None
     num_threads: int
 
     @property
@@ -88,6 +89,7 @@ def run_isolated(
         stages_ms={k: float(v) for k, v in out["stages_ms"].items()},
         peak_rss_mib=float(out["peak_rss_mib"]),
         model_peak_rss_mib=float(out["model_peak_rss_mib"]),
+        energy_j_per_inf=out["energy_j_per_inf"],
         num_threads=int(out["num_threads"]),
     )
 
