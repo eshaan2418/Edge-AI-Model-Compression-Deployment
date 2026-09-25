@@ -10,6 +10,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch.nn as nn
@@ -44,35 +45,19 @@ def _worker_env() -> dict[str, str]:
     return env
 
 
-def run_isolated(
-    model_path: Path,
-    input_shape: tuple[int, ...],
-    cfg: BenchmarkConfig,
-    *,
-    timeout_s: float = 3600.0,
-) -> ProcessResult:
-    """Benchmark an exported artifact (see ``inference.backends``) in a new Python process."""
+def spawn_worker(
+    module: str, request: dict[str, Any], *, timeout_s: float = 3600.0
+) -> dict[str, Any]:
+    """Run ``python -m module REQUEST.json RESULT.json`` in a fresh process.
+
+    ``request`` gets ``t_spawn_ns`` (monotonic, system-wide) added just before
+    the spawn so the worker can report its startup time.
+    """
     with tempfile.TemporaryDirectory() as tmp:
-        request, result = Path(tmp) / "request.json", Path(tmp) / "result.json"
-        t_spawn = time.monotonic_ns()
-        request.write_text(
-            json.dumps(
-                {
-                    "model_path": str(model_path),
-                    "input_shape": list(input_shape),
-                    "config": cfg.to_dict(),
-                    "t_spawn_ns": t_spawn,
-                }
-            )
-        )
+        req_path, res_path = Path(tmp) / "request.json", Path(tmp) / "result.json"
+        req_path.write_text(json.dumps({**request, "t_spawn_ns": time.monotonic_ns()}))
         proc = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "edge_ai_compression.benchmarking.worker",
-                str(request),
-                str(result),
-            ],
+            [sys.executable, "-m", module, str(req_path), str(res_path)],
             capture_output=True,
             text=True,
             timeout=timeout_s,
@@ -82,7 +67,22 @@ def run_isolated(
             raise RuntimeError(
                 f"benchmark worker failed (exit {proc.returncode}):\n{proc.stderr[-4000:]}"
             )
-        out = json.loads(result.read_text())
+        return json.loads(res_path.read_text())
+
+
+def run_isolated(
+    model_path: Path,
+    input_shape: tuple[int, ...],
+    cfg: BenchmarkConfig,
+    *,
+    timeout_s: float = 3600.0,
+) -> ProcessResult:
+    """Benchmark an exported artifact (see ``inference.backends``) in a new Python process."""
+    out = spawn_worker(
+        "edge_ai_compression.benchmarking.worker",
+        {"model_path": str(model_path), "input_shape": list(input_shape), "config": cfg.to_dict()},
+        timeout_s=timeout_s,
+    )
     return ProcessResult(
         trace_ns=np.asarray(out["trace_ns"], dtype=np.int64),
         stages_ms={k: float(v) for k, v in out["stages_ms"].items()},

@@ -1,0 +1,22 @@
+# Offline smoke test of the kernel-study pipeline: tiny shapes, every op, machine
+# peaks, 2 fresh processes per measurement. Needs the kernels built.
+study: smoke_kernel_study
+results_dir: results/smoke
+peaks: true
+isas: [auto]
+shapes:
+  - [8, 16, 32]
+  - [4, 1, 64]
+ops:
+  - gemm_f32
+  - gemm_s8
+  - gemm_w4
+  - gemm_sparse24
+  - {op: gemm_csr, sparsity: [0.5, 0.9]}
+benchmark:
+  warmup_iters: 2
+  min_warmup_s: 0.0
+  iters: 5
+  min_time_s: 0.05
+  process_repeats: 2
+  strict_environment: false

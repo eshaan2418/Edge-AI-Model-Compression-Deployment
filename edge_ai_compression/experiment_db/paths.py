@@ -15,3 +15,11 @@ def experiments_jsonl(results_dir: Path) -> Path:
 
 def artifact_dir(results_dir: Path, experiment_id: str) -> Path:
     return results_dir / "artifacts" / experiment_id
+
+
+def kernel_benchmarks_csv(results_dir: Path) -> Path:
+    return results_dir / "kernel_benchmarks.csv"
+
+
+def kernel_benchmarks_jsonl(results_dir: Path) -> Path:
+    return results_dir / "kernel_benchmarks.jsonl"
