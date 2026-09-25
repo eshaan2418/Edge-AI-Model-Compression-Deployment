@@ -99,3 +99,27 @@ Caveats: the metric treats layers independently (no cross-layer interaction term
 
 **5. Why would SmoothQuant fail to help on your ViTs, and how would you know?**
 SmoothQuant moves per-channel activation scale into the weights. That only helps if a few activation channels are much larger than the rest, so per-tensor activation scales waste resolution. Dettmers et al. saw systematic outlier features emerge around the billion-parameter scale, and a small CIFAR ViT may have none. So I measure first: `outlier_stats` reports max/median per-channel activation maxima at each LayerNorm-fed linear. If the ratios are near 1–10, I expect SmoothQuant ≈ RTN and report that as a negative result. A test with an injected outlier channel confirms the method works when the precondition holds.
+
+---
+
+## Phase 4: pruning + recovery
+
+**1. Why does channel pruning only remove channels inside residual blocks?**
+A residual block computes x + F(x), so F's output channels must match x's. Removing an output channel of the block's last conv would require removing the same channel from the skip path and every block that reads it: coupled groups across the network (the problem DepGraph, Fang et al. 2023, solves in general). The inner channels (conv1's outputs, which are only read by conv2) are free to remove without touching anything else. It's a clean, always-valid subset. The limitation is that block outputs stay at full width.
+
+**2. You recover sparse models with LoRA. What goes wrong if you merge the adapters naively?**
+The merged weight is W + BA, and BA is a dense matrix, so every pruned zero becomes nonzero and the model is dense again. The sparsity win disappears without any error being raised. I mask the update during training *and* at merge time (W + M ⊙ BA), so the network trains in exactly the function space it will be deployed in. A unit test checks that every pruned weight is still zero after recovery.
+
+**3. What's the difference between `pruning_sparsity` and `weight_sparsity`, and why store both?**
+`pruning_sparsity` is what I asked for; `weight_sparsity` is what the evaluated model actually has. They diverge for real reasons:
+- 2:4 skips the stem (K = 27 isn't divisible by 4).
+- Channel pruning physically removes weights instead of zeroing them.
+- Quantization can round small weights to zero.
+
+Any "sparsity vs latency" analysis has to use the measured number, or it attributes speedups to sparsity that isn't there.
+
+**4. Why would 2:4 beat 50% unstructured sparsity in latency, at the same number of zeros?**
+2:4 has fixed, tiny metadata (2 bits per kept value) and every group has the same shape. So a kernel can process groups with no data-dependent branching and predictable loads, and dedicated hardware (Ampere sparse tensor cores) can run it at 2× throughput. Unstructured sparsity at 50% needs a 4-byte index per nonzero: a CSR matrix is as large as the dense one, and each nonzero triggers an indirect load. On a CPU without sparse units, the Phase 2 kernel study measures whether 2:4's regularity is enough to win. That's an empirical claim I don't assume.
+
+**5. How do you make "fine-tune vs LoRA recovery" a fair comparison?**
+Both get the same budget: the same epochs, learning-rate schedule and data, starting from the same pruned weights, and the same 3 training seeds. The result is a trade-off, not a single winner: LoRA trains about 1–5% of the parameters (so it fits in less memory and each step's weight update is cheaper), while full fine-tuning can move every surviving weight. I report accuracy recovered per trainable parameter as well as absolute accuracy.

@@ -40,9 +40,17 @@ Resume point for autonomous work. Updated after every commit.
   `notebooks/tracks.ipynb`. Docs: docs/quantization.md.
 - Results PENDING (heavy runs, see NEEDS ESHAAN 4-6).
 
-### Next: Phase 4 (pruning + recovery), branch `phase4-pruning` stacked on `phase3-ptq`
-Plan to write into DECISIONS: unstructured (existing), 2:4 structured, channel pruning, LoRA recovery
-fine-tuning; lower to engine (sparse24/csr, channel-pruned dense); connect to Phase 2 sparsity study.
+### Phase 4 (pruning + recovery): COMPLETE, pushed on `phase4-pruning`
+- `compression/pruning/`: nm (2:4), channel (inner residual channels, L1 | BN gamma), recovery
+  (masked fine-tune, masked LoRA), weight_sparsity. PruningSection modes/recovery/tag. DB schema v4.
+- `run_track.py` (generic tracks: resnet18_ptq, vit_s_ptq, resnet18_prune), `notebooks/tracks.ipynb`.
+- Ladder: `sweeps/prune_ladder_resnet18_cifar10.yml` (39 runs). Docs: docs/pruning.md.
+- Results PENDING (NEEDS ESHAAN 7).
+
+### Next: Phase 5 (pre-training variants + signal logging), branch `phase5-pretraining`
+Plan into DECISIONS: trainer variants (fake-quant noise / QAT-from-scratch, RigL dynamic sparsity,
+kurtosis regularizer); signal logging every N steps (weight kurtosis, activation outliers, Hutchinson
+trace, SAM sharpness, weight norms) into the DB; scaling configs (ResNet widths/depths, ViT sizes).
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
@@ -78,3 +86,5 @@ fine-tuning; lower to engine (sparse24/csr, channel-pruned dense); connect to Ph
 6. **(Optional) ImageNet validation vs the papers:** needs ImageNet-1k (license-gated) in
    `data/imagenet/{train,val}` ImageFolder layout, then
    `python launch_sweep.py --config edge_ai_compression/configs/sweeps/ptq_validation_imagenet.yml --set device=cuda`.
+7. **Phase 4 pruning ladder:** `notebooks/tracks.ipynb`, resnet18_prune cells (reuses the Phase 3
+   ResNet-18 checkpoints; trains them if missing).
