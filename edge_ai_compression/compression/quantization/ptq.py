@@ -19,6 +19,7 @@ from edge_ai_compression.compression.quantization.reconstruction import (
     ReconstructionConfig,
     reconstruct,
 )
+from edge_ai_compression.compression.quantization.smoothquant import SmoothQuantConfig, smooth
 from edge_ai_compression.core.experiment import QuantizationSection
 
 
@@ -72,6 +73,10 @@ def run_quantization(
 ) -> nn.Module:
     """Fold BN, swap in quantized layers, calibrate activations, then run the method."""
     fold_bn(model)
+    if sec.method == "smoothquant":
+        if loader is None:
+            raise ValueError("smoothquant needs calibration data (a train loader)")
+        smooth(model, loader, SmoothQuantConfig.from_dict(sec.options), device)
     fp_model = copy.deepcopy(model) if sec.method in ("adaround", "brecq") else None
     layer_bits = hawq_bits(model, sec, loader, device) if sec.method == "hawq" else None
     quantize_model(

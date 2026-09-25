@@ -157,3 +157,8 @@ All methods quantize a **BN-folded** model (conv bias absorbs BN) into `QuantCon
 ### D3.7 QAT keeps BatchNorm folded
 - **Alternatives:** keep BN unfolded during QAT and fold at the end, freezing BN statistics after a few epochs (Krishnamoorthi 2018; Jacob et al. 2018).
 - **Why:** starting from the calibrated, BN-folded PTQ model keeps one model representation across the ladder and makes the QAT result directly lowerable to the engine. The cost is that the model can't re-estimate BN statistics under quantization noise. Fine for short fine-tunes; a limitation for long QAT.
+
+### D3.8 ViT track: three small ViTs; SmoothQuant only claimed if outliers exist
+- `vit_t_cifar` / `vit_s_cifar` / `vit_m_cifar` (patch 4, dims 128/256/384, depths 6/6/8), explicit `qkv`/`proj`/`fc1`/`fc2` linears so every projection is quantizable. Attention matmuls (QKᵀ, AV) stay in float: SmoothQuant's W8A8 targets the linear layers.
+- The C++ engine does not lower LayerNorm/GELU/attention, so ViT quantization is evaluated in simulation (accuracy). ViT latency comes from torch_eager/onnxruntime.
+- `smoothquant.outlier_stats` (max/median of per-channel activation maxima at LayerNorm-fed linears) is logged before SmoothQuant results are interpreted. Systematic outliers are reported at LLM scale (Dettmers et al. 2022); at CIFAR-ViT scale SmoothQuant may be a no-op, which would be reported as a negative result.

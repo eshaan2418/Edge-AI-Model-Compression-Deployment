@@ -8,6 +8,7 @@ from edge_ai_compression.models.efficientnet import efficientnet_b0_cifar
 from edge_ai_compression.models.mobilenet import mobilenet_v2_cifar
 from edge_ai_compression.models.resnet import resnet18_cifar
 from edge_ai_compression.models.student_models import small_cnn_student
+from edge_ai_compression.models.vit import VIT_SIZES, vit_cifar
 
 
 class ModelRegistry:
@@ -29,6 +30,8 @@ def _default_register() -> None:
     ModelRegistry.register("mobilenet_v2_cifar", mobilenet_v2_cifar)
     ModelRegistry.register("efficientnet_b0_cifar", efficientnet_b0_cifar)
     ModelRegistry.register("small_cnn_student", small_cnn_student)
+    for size in VIT_SIZES:
+        ModelRegistry.register(size, lambda num_classes=10, _s=size: vit_cifar(_s, num_classes))
 
 
 _default_register()

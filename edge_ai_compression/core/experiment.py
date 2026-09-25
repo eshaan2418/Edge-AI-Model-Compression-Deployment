@@ -24,7 +24,7 @@ class PruningSection:
     scorer: str = "magnitude"
 
 
-QUANT_METHODS = ("rtn", "adaround", "brecq", "qat", "hawq")
+QUANT_METHODS = ("rtn", "adaround", "brecq", "qat", "hawq", "smoothquant")
 QUANT_KEYS = {
     "enabled",
     "method",
