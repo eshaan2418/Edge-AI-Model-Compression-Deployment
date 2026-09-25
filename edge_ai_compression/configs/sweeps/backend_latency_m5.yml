@@ -1,0 +1,11 @@
+# End-to-end ResNet-18 latency per backend on the M5 Pro (1 thread, batch 1).
+sweep_id: backend_latency_m5
+base_config: edge_ai_compression/configs/experiments/backend_latency_base.yml
+variants:
+  - {benchmark: {backend: torch_eager}}
+  - {benchmark: {backend: onnxruntime}}
+  - {benchmark: {backend: edge_f32}}
+  - {benchmark: {backend: edge_int8}}
+  - {benchmark: {backend: edge_w4}}
+  - {benchmark: {backend: edge_sparse24}}
+  - {benchmark: {backend: edge_csr}}

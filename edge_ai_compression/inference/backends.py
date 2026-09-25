@@ -62,6 +62,8 @@ class OnnxRuntime:
             (torch.zeros(input_shape),),
             str(path),
             dynamo=True,
+            external_data=False,  # one self-contained file, so size_mb counts the weights
+            verbose=False,
             input_names=["input"],
             output_names=["logits"],
         )

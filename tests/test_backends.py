@@ -83,3 +83,11 @@ def test_evaluator_uses_backend_for_accuracy_and_size():
     assert reports["edge_f32"].accuracy == reports["torch_eager"].accuracy
     assert reports["edge_int8"].size_mb < reports["edge_f32"].size_mb
     assert reports["edge_int8"].config.backend == "edge_int8"
+
+
+def test_onnx_artifact_is_self_contained(tmp_path):
+    m = _model()
+    path = get_backend("onnxruntime").export(m, (1, 3, 8, 8), tmp_path)
+    assert [f.name for f in tmp_path.iterdir()] == ["model.onnx"]
+    weights = sum(p.numel() for p in m.parameters()) * 4
+    assert path.stat().st_size > weights
