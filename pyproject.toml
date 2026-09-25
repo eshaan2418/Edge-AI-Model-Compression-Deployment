@@ -35,11 +35,10 @@ all = ["edge-ai-compression[tf-mot,viz,dev]"]
 
 [project.scripts]
 auto-compress = "edge_ai_compression.auto_compress:main"
-mc = "src.model_compression.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["edge_ai_compression*", "src*"]
+include = ["edge_ai_compression*"]
 
 [tool.black]
 line-length = 100
