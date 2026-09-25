@@ -7,16 +7,13 @@ research pipeline for searching the compression trade‑off space.
 
 </div>
 
-This repository contains **two complementary stacks**. Pick the one that matches
-what you want to do:
+The primary stack is a **PyTorch research framework** in `edge_ai_compression/`:
+end‑to‑end compression experiments on CPU (prune / quantize / distill),
+benchmarking, multi‑objective search, Pareto analysis, and experiment tracking.
+Everything runs on a normal **CPU**; no GPU needed.
 
-| Stack | Language | Where | Use it for |
-|-------|----------|-------|------------|
-| **Research framework** | PyTorch | `edge_ai_compression/` (+ `src/model_compression/` legacy CLI) | End‑to‑end compression experiments on CPU: prune / quantize / distill, benchmark, multi‑objective search, Pareto analysis, experiment tracking. |
-| **TFLite deployment scripts** | TensorFlow / Keras | root `*.py` (`train_baseline.py`, `prune_model.py`, `quantize_model.py`, `distill_model.py`, `benchmark.py`) | Producing and benchmarking a ResNet50 CIFAR‑10 baseline and TFLite artifacts (dynamic‑range + full‑integer int8). |
-
-The two stacks are independent — the PyTorch framework does **not** require
-TensorFlow, and vice versa. Everything runs on a normal **CPU**; no GPU needed.
+Earlier code (a standalone PyTorch ResNet‑18 CLI and the TensorFlow / Keras
+TFLite scripts for ResNet50) is frozen under [`legacy/`](legacy/README.md).
 
 ---
 
@@ -35,7 +32,7 @@ pip install -e ".[dev]"
 
 # Sanity check:
 ruff check .
-pytest -q                          # 8 tests, ~3s, no downloads
+pytest -q                          # 10 tests, no downloads
 
 # Tiny end‑to‑end experiment — fully offline, no downloads, ~3s on CPU:
 python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
@@ -51,7 +48,7 @@ real run.
 ### Optional extras
 
 ```bash
-pip install -e ".[tf-mot]"   # TensorFlow + tf-keras + tf-mot (the root TF/TFLite scripts)
+pip install -e ".[tf-mot]"   # TensorFlow + tf-keras + tf-mot (legacy/tflite/ scripts)
 pip install -e ".[viz]"      # matplotlib (plot_results.py)
 pip install -e ".[all]"      # everything above
 ```
@@ -84,7 +81,7 @@ full experiment.
 Other entrypoints (all support `--help`):
 
 ```bash
-python auto_compress.py --device cpu --max-latency-ms 50 \
+auto-compress --device cpu --max-latency-ms 50 \
   --max-size-mb 50 --min-accuracy 0.5 --budget 4     # constrained AutoML search (runs `budget` full experiments)
 python search_compression.py --objective pareto \
   --results results/experiments.csv                   # Pareto frontier from logged runs
@@ -94,20 +91,6 @@ python plot_results.py                                # needs .[viz]
 python launch_sweep.py --config configs/sweeps/full_compression_study.yml
 python resume_sweep.py --sweep-id full_compression_study
 ```
-
-### Legacy PyTorch CLI (`mc`)
-
-`src/model_compression/` is a smaller, self‑contained ResNet‑18 pipeline exposed
-as the `mc` console script (installed with the package):
-
-```bash
-mc train --max-batches 5      # quick baseline train (smoke)
-mc prune  --help
-mc quantize --help
-mc distill --help
-```
-
-`python train.py --max-batches 5` is a thin wrapper around `mc train`.
 
 ### What the framework implements
 
@@ -129,45 +112,12 @@ Layout: `core`, `compression`, `optimization`, `benchmarking`, `hardware`,
 
 ---
 
-## TensorFlow / Keras TFLite scripts (root)
+## Legacy code
 
-These produce a ResNet50 CIFAR‑10 baseline and TFLite artifacts. Install the TF
-extra first:
-
-```bash
-pip install -e ".[tf-mot]"
-```
-
-> **Keras 3 note:** these scripts target the Keras 2 SavedModel API and set
-> `TF_USE_LEGACY_KERAS=1` at import time (satisfied by the `tf-keras` package
-> that the `tf`/`tf-mot` extras install). No manual configuration needed.
-
-Every script takes CLI flags and a `--limit` (or `--num-calibration-samples`)
-smoke knob, so you no longer need to edit source with `sed`:
-
-```bash
-# 1) Train a baseline -> models/baseline_model/  (--weights none skips ImageNet download)
-python train_baseline.py --epochs 1 --limit 256 --weights none
-
-# 2) Quantize -> models/quantized_dynamic_range.tflite + models/quantized_integer_only.tflite
-python quantize_model.py --num-calibration-samples 50
-
-# 3) Prune (TF‑MOT) -> models/pruned_model/
-python prune_model.py --epochs 1 --limit 256
-
-# 4) Distill a compact student -> models/student_model/
-python distill_model.py --epochs 1 --limit 256
-
-# 5) Benchmark any SavedModel dir or .tflite file (size, latency, RAM, accuracy)
-python benchmark.py --model-path models/baseline_model --limit 200
-python benchmark.py --model-path models/quantized_integer_only.tflite --limit 200
-
-# Combine pruning + full-integer quantization:
-python combine_and_quantize.py --pruned models/pruned_model \
-  --out models/combined_pruned_quantized.tflite --num-calibration-samples 50
-```
-
-`benchmark.py` appends a row to `benchmark_results.md` on each run.
+`legacy/` holds the old `src/model_compression/` PyTorch CLI (formerly `mc`)
+and the TensorFlow / Keras TFLite scripts that used to live at the repo root.
+It is not installed with the package and is kept for reference only; see
+[`legacy/README.md`](legacy/README.md) for how to run it.
 
 ---
 
@@ -175,13 +125,12 @@ python combine_and_quantize.py --pruned models/pruned_model \
 
 ```
 edge_ai_compression/     PyTorch research framework (models, data, compression, search, DB)
-src/model_compression/   Legacy PyTorch ResNet-18 pipeline (the `mc` CLI)
-train.py run_experiment.py auto_compress.py search_compression.py ...   root wrappers
-train_baseline.py prune_model.py quantize_model.py distill_model.py     TF/Keras scripts
-benchmark.py combine_and_quantize.py                                     TFLite tooling
-configs/  edge_ai_compression/configs/                                   YAML configs
+run_experiment.py search_compression.py train_surrogate.py ...   root wrappers
+configs/sweeps/          sweep definitions for launch_sweep.py
+edge_ai_compression/configs/   experiment / dataset / hardware / search-space YAML
 tests/                   pytest suite (CPU, no network)
-models/  data/  results/  benchmark_results.md   generated artifacts (git-ignored)
+legacy/                  frozen PyTorch CLI + TF/TFLite scripts (not installed)
+models/  data/  results/ generated artifacts (git-ignored)
 ```
 
 Generated artifacts (`models/`, `data/`, dataset downloads, `results/artifacts`,
@@ -198,7 +147,7 @@ pytest -q             # tests
 ```
 
 CI (`.github/workflows/ci.yml`) runs `ruff check .`, `ruff format --check .`,
-and `pytest -q` on Python 3.11.
+`pytest -q`, and the offline smoke experiment on Python 3.11.
 
 ## License
 
