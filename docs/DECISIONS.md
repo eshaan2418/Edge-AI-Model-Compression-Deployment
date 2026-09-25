@@ -186,3 +186,35 @@ Engine lowering: `nm` 2:4 → `edge_sparse24` (pattern preserved through BN fold
 
 ### D4.2 Removed `compression/pruning/modes.py`
 - An unused enum listing unimplemented modes (movement, lottery ticket). Valid modes are now validated by `PruningSection`.
+
+---
+
+## Phase 5: pre-training variants + compressibility signals
+
+### Plan (self-approved)
+**Trainer variants** (`train.variant`, options under `train.variant_options`):
+- `standard`
+- `quant_noise`: Quant-Noise (Fan et al., ICLR 2021). Each forward pass fake-quantizes a random fraction `p` of each conv/linear weight to `bits` bits (per channel, straight-through). `p = 1` is QAT from scratch.
+- `kurtosis`: kurtosis regularization (Shkolnik et al., NeurIPS 2020). The loss gets λ Σ_l (Kurt(W_l) − K_T)², K_T = 1.8 (a uniform distribution), making weights uniform-like and robust to quantization.
+- `rigl`: RigL dynamic sparse training (Evci et al., ICML 2020). Fixed overall sparsity with an ERK per-layer allocation. Every ΔT steps it drops the smallest-magnitude active weights and grows the same number of inactive weights with the largest dense-gradient magnitude, on a cosine-decayed update fraction that stops at 75% of training.
+
+**Signals**, logged at every checkpoint step and every `signal_every_steps`, on a fixed probe batch:
+- per-layer weight kurtosis
+- weight outlier ratio (max|w| / std)
+- weight norms
+- activation outlier ratios (max|x| / std, and per-channel max / median as in SmoothQuant)
+- Hutchinson Hessian trace
+- SAM-style sharpness: L(w + ρ·g/‖g‖) − L(w), with ρ = 0.05 (Foret et al., ICLR 2021)
+- probe loss
+
+Rows go to `training_signals.csv` (run id, step, scalar summaries), with per-layer detail in the run's `signals.jsonl`. These are the surrogate features for Phase 6's early-predictability study: predict the *final* post-compression accuracy from signals at step k.
+
+**Scaling family:** `resnet{depth}_w{width}_cifar` for depth ∈ {10, 18, 34} and width ∈ {0.25, 0.5, 1.0} (BasicBlock ResNets, CIFAR stem), plus the three ViTs. Training length is varied through `epochs`.
+
+**Training sweeps:** a sweep with `kind: train` runs `run_training` per variant (same resume semantics).
+
+### D5.1 RigL masks enforced by zeroing after each step, not by parametrization
+- **Why:** growth needs the *dense* gradient ∂L/∂W, including inactive positions. With a forward on the dense weight tensor (inactive entries zero), autograd gives exactly that. Inactive weights and their momentum buffers are re-zeroed after every optimizer step. A mask parametrization would hide the inactive gradients.
+
+### D5.2 Quant-Noise via parametrization
+- Implemented with `torch.nn.utils.parametrize` (w + mask ⊙ (Q(w) − w).detach()), removed at the end of training with the original weights kept, so checkpoints are plain float models.
