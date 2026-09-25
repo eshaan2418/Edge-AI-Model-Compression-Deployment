@@ -145,3 +145,11 @@ All methods quantize a **BN-folded** model (conv bias absorbs BN) into `QuantCon
 
 ### D3.4 No hyper-parameter tuning on the test set
 - `build_loaders` has no validation split. Calibration uses training images; any tuned knob (percentile, λ, iterations) is set from the papers' defaults or on a held-out slice of the training set, never the test set.
+
+### D3.5 Removed the torch.ao dynamic-quantization path
+- `compression/quantization/dynamic.py`, `utils/quant_engine.py` and the `quantization.mode: dynamic_linear` key are gone (the key now raises). Quantization is always the simulated ladder (`method: rtn | ...`), and deployment goes through `edge_quant`.
+
+### D3.6 Engine vs simulation: exact per layer, not bit-identical end to end
+- **Finding:** C++ `quantize_s8` multiplied by `1/scale` while the simulation divides. Last-bit differences flipped rounding ties, and a W8A8 ResNet-18 differed by 1.6% relative at the logits. Fixed: the kernel now divides.
+- **Remaining, intrinsic:** the engine accumulates exactly in int32 and rescales once; the simulation accumulates dequantized products in fp32. Those differ at ~1e-7, which occasionally flips a value sitting exactly on a rounding boundary at the next layer's input quantization. One-step differences then compound in a deep net (about 1% at the logits for a random-weight ResNet-18). The same happens between any two correct int8 implementations.
+- **Test contract:** given identical inputs, every lowered layer matches its simulated layer to 1e-5 relative; end to end, relative error < 5% with identical argmax. Accuracy numbers are always measured with the backend that is benchmarked.

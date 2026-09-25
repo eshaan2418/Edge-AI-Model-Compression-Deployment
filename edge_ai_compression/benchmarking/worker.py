@@ -45,9 +45,7 @@ def main(argv: list[str]) -> None:
     torch.set_num_threads(cfg.num_threads)
 
     from edge_ai_compression.inference.backends import get_backend
-    from edge_ai_compression.utils.quant_engine import ensure_quantized_engine
 
-    ensure_quantized_engine()
     run = get_backend(cfg.backend).load(Path(req["model_path"]), cfg.num_threads)
     t_load = time.monotonic_ns()
 

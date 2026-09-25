@@ -1,0 +1,37 @@
+# Offline smoke test of the PTQ path: fold BN, W8A8 per-channel RTN weights with
+# min-max-calibrated static activations, run on the C++ engine (edge_quant) with
+# the same integer weights and scales. Needs the kernels built.
+model: resnet18_cifar
+dataset: fake
+data_dir: data
+batch_size: 16
+num_workers: 0
+device: cpu
+seed: 42
+limit_samples: 32
+checkpoint_out: models/smoke_ptq.pt
+compression_order_tag: quantize
+compression:
+  pruning:
+    enabled: false
+  quantization:
+    enabled: true
+    method: rtn
+    weight_bits: 8
+    act_bits: 8
+    granularity: per_channel
+    calibration: {method: minmax, num_samples: 32}
+  distillation:
+    enabled: false
+benchmark:
+  backend: edge_quant
+  batch_size: 1
+  num_threads: 1
+  warmup_iters: 2
+  min_warmup_s: 0.0
+  iters: 5
+  process_repeats: 2
+  strict_environment: false
+experiment_db:
+  results_dir: results/smoke
+  diagnostics_max_batches: 1

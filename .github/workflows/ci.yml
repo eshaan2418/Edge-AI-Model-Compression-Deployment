@@ -38,6 +38,7 @@ jobs:
           python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
           python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_benchmark.yml
           python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_inference.yml
+          python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_ptq.yml
           python run_kernel_study.py --config edge_ai_compression/configs/studies/smoke_kernel_study.yml
           python train_model.py --config edge_ai_compression/configs/train/smoke_train.yml
 

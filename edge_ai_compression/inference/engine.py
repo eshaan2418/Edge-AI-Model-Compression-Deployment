@@ -15,6 +15,12 @@ Modes (applied to every conv / linear layer):
   at compile time (lossy unless the model was trained 2:4). Layers whose K is not
   a multiple of 4 (e.g. a 3-channel 3x3 stem, K=27) stay dense f32.
 - ``csr``: unstructured sparse weights (the model's existing zeros)
+- ``quant``: for models from the PTQ/QAT ladder (``QuantConv2d`` / ``QuantLinear``):
+  each layer runs with exactly the integer weights and static activation scale
+  of its simulation. Weight-bits <= 8 with 8-bit activations -> int8 kernel
+  (4-bit codes run exact on it, without the storage saving); 4-bit weight-only
+  -> int4 kernel (group = the layer's group size, or K per channel); 8-bit
+  weight-only -> fp32 on dequantized weights. Other combinations raise.
 """
 
 from __future__ import annotations
@@ -30,9 +36,14 @@ import torch.fx as fx
 import torch.nn as nn
 import torch.nn.functional as F
 
+from edge_ai_compression.compression.quantization.modules import (
+    QuantConv2d,
+    QuantLayer,
+    QuantLinear,
+)
 from edge_ai_compression.inference import kernels, packing
 
-MODES = ("f32", "int8", "w4", "sparse24", "csr")
+MODES = ("f32", "int8", "w4", "sparse24", "csr", "quant")
 W4_GROUP = 32
 
 
@@ -67,7 +78,7 @@ def _payload(mode: str, w: np.ndarray) -> tuple[str, dict[str, np.ndarray]]:
         return mode, {"q": q, "scale": scale}
     if mode == "w4":
         q, scales = packing.quantize_w4(w, W4_GROUP)
-        return mode, {"q": q, "scales": scales}
+        return mode, {"q": q, "scales": scales, "group": np.array(W4_GROUP)}
     if mode == "sparse24":
         values, meta = packing.prune_24(w)
         return mode, {"values": values, "meta": meta}
@@ -75,6 +86,36 @@ def _payload(mode: str, w: np.ndarray) -> tuple[str, dict[str, np.ndarray]]:
         values, col, row_ptr = packing.to_csr(w)
         return mode, {"values": values, "col": col, "row_ptr": row_ptr}
     raise ValueError(f"unknown mode {mode}")
+
+
+def _quant_payload(name: str, mod: QuantLayer) -> tuple[str, dict[str, np.ndarray]]:
+    """Lower a simulated quantized layer to kernel payloads with identical arithmetic."""
+    spec, codes = mod.spec, mod.integer_weight()
+    m, k = codes.shape
+    if mod.act_bits == 8 and spec.granularity in ("per_tensor", "per_channel"):
+        scale = mod.w_scale.detach().reshape(-1).expand(m).float().numpy().copy()
+        payload = {"q": codes.to(torch.int8).numpy(), "scale": scale}
+        if mod.act_enabled:
+            payload["act_scale"] = np.array(float(mod.a_scale), dtype=np.float32)
+        return "int8", payload
+    if mod.act_bits is None and spec.bits == 4:
+        group = spec.group_size if spec.granularity == "per_group" else k
+        scales = (
+            mod.w_scale.detach().float().reshape(m, -1)
+            if spec.granularity != "per_tensor"
+            else (mod.w_scale.detach().float().reshape(1, 1).expand(m, 1))
+        )
+        return "w4", {
+            "q": packing.pack_nibbles(codes.to(torch.int8).numpy()),
+            "scales": np.ascontiguousarray(scales.numpy()),
+            "group": np.array(group),
+        }
+    if mod.act_bits is None:
+        w = mod.quant_weight().detach().reshape(m, -1).float().numpy()
+        return "f32", {"w": np.ascontiguousarray(w)}
+    raise NotImplementedError(
+        f"{name}: w{spec.bits}/{spec.granularity} with a{mod.act_bits} has no kernel"
+    )
 
 
 @dataclass
@@ -108,16 +149,22 @@ class _Gemm:
         elif self.mode == "int8":
             self.packed = kernels.pack_s8(p["q"], self.isa)
         elif self.mode == "w4":
-            self.packed = kernels.make_w4(p["q"], p["scales"], self.k, W4_GROUP)
+            self.packed = kernels.make_w4(p["q"], p["scales"], self.k, int(p["group"]))
         elif self.mode == "sparse24":
             self.packed = kernels.make_sparse24(p["values"], p["meta"])
         elif self.mode == "csr":
             self.packed = kernels.make_csr(p["values"], p["col"], p["row_ptr"], self.k)
 
+    def act_scale(self, x: np.ndarray) -> float:
+        """Static calibrated scale if the layer has one, else dynamic absmax."""
+        if "act_scale" in self.payload:
+            return float(self.payload["act_scale"])
+        return kernels.absmax(x) / packing.QMAX or 1.0
+
     def matmul(self, b: np.ndarray) -> np.ndarray:
         """[K, N] activations -> [M, N] outputs (bias and ReLU applied)."""
         if self.mode == "int8":
-            scale = kernels.absmax(b) / packing.QMAX or 1.0
+            scale = self.act_scale(b)
             acc = kernels.gemm_s8(self.packed, kernels.quantize_s8(b, scale))
             return kernels.requantize(acc, self.payload["scale"], scale, self.bias, self.relu)
         fn = {
@@ -142,7 +189,7 @@ class _Gemm:
         )
         if self.mode == "int8":
             # Quantize once before im2col (8x less data to rearrange than fp32).
-            scale = kernels.absmax(x) / packing.QMAX or 1.0
+            scale = self.act_scale(x)
             cols = kernels.im2col(kernels.quantize_s8(x, scale), kh, kw, stride, pad)
             acc = kernels.gemm_s8(self.packed, cols)
             out = kernels.requantize(acc, self.payload["scale"], scale, self.bias, self.relu)
@@ -163,7 +210,14 @@ class _Node:
     pool: tuple[int, int, int] | None = None  # maxpool (kernel, stride, pad)
 
 
-def _fold_bn(conv: nn.Conv2d, bn: nn.BatchNorm2d | None) -> tuple[np.ndarray, np.ndarray]:
+class _LeafTracer(fx.Tracer):
+    """Keep quantized wrappers as single graph nodes."""
+
+    def is_leaf_module(self, m: nn.Module, module_qualified_name: str) -> bool:
+        return isinstance(m, QuantLayer) or super().is_leaf_module(m, module_qualified_name)
+
+
+def _fold_bn(conv: nn.Module, bn: nn.BatchNorm2d | None) -> tuple[np.ndarray, np.ndarray]:
     w = conv.weight.detach().double()
     b = conv.bias.detach().double() if conv.bias is not None else torch.zeros(w.shape[0])
     if bn is not None:
@@ -237,7 +291,13 @@ def compile_model(model: nn.Module, mode: str = "f32", isa: str = "auto") -> Eng
     if mode not in MODES:
         raise ValueError(f"mode must be one of {MODES}")
     isa = kernels.best_isa() if isa == "auto" else isa
-    gm = fx.symbolic_trace(model.eval())
+    has_quant = any(isinstance(m, QuantLayer) for m in model.modules())
+    if has_quant != (mode == "quant"):
+        raise ValueError(
+            "models with QuantConv2d/QuantLinear layers need mode 'quant' (backend edge_quant), "
+            "and mode 'quant' needs such a model"
+        )
+    gm = fx.GraphModule(model, _LeafTracer().trace(model.eval()))
     graph_nodes = list(gm.graph.nodes)
     users = {n: list(n.users) for n in graph_nodes}
 
@@ -277,8 +337,12 @@ def compile_model(model: nn.Module, mode: str = "f32", isa: str = "auto") -> Eng
             input_name = n.name
         elif n.op == "output":
             output_name = src(n.args[0])
-        elif isinstance(mod, nn.Conv2d):
-            if mod.groups != 1 or mod.dilation != (1, 1) or mod.padding_mode != "zeros":
+        elif isinstance(mod, nn.Conv2d | QuantConv2d):
+            if (
+                mod.groups != 1
+                or mod.dilation != (1, 1)
+                or getattr(mod, "padding_mode", "zeros") != "zeros"
+            ):
                 raise NotImplementedError(f"{n.name}: only groups=1, dilation=1, zero padding")
             if mod.stride[0] != mod.stride[1] or mod.padding[0] != mod.padding[1]:
                 raise NotImplementedError(f"{n.name}: only square stride/padding")
@@ -293,11 +357,15 @@ def compile_model(model: nn.Module, mode: str = "f32", isa: str = "auto") -> Eng
             w, b = _fold_bn(mod, bn)  # type: ignore[arg-type]
             relu = fuse_relu(last)
             kh, kw = mod.kernel_size
-            eff, payload = _payload(mode, w)
+            eff, payload = (
+                _quant_payload(n.name, mod)
+                if isinstance(mod, QuantConv2d)
+                else _payload("f32" if mode == "quant" else mode, w)
+            )
             geom = (kh, kw, mod.stride[0], mod.padding[0])
             gemm = _Gemm(n.name, eff, w.shape[0], w.shape[1], payload, b, relu, geom, isa)
             nodes.append(_Node(n.name, "gemm", [src(n.args[0])], gemm=gemm))
-        elif isinstance(mod, nn.Linear):
+        elif isinstance(mod, nn.Linear | QuantLinear):
             w = mod.weight.detach().float().numpy()
             b = (
                 mod.bias.detach().float().numpy()
@@ -305,7 +373,11 @@ def compile_model(model: nn.Module, mode: str = "f32", isa: str = "auto") -> Eng
                 else np.zeros(w.shape[0], np.float32)
             )
             relu = fuse_relu(n)
-            eff, payload = _payload(mode, w)
+            eff, payload = (
+                _quant_payload(n.name, mod)
+                if isinstance(mod, QuantLinear)
+                else _payload("f32" if mode == "quant" else mode, w)
+            )
             gemm = _Gemm(n.name, eff, w.shape[0], w.shape[1], payload, b, relu, None, isa)
             nodes.append(_Node(n.name, "gemm", [src(n.args[0])], gemm=gemm))
         elif isinstance(mod, nn.BatchNorm2d):

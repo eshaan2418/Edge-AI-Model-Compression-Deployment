@@ -36,7 +36,9 @@ def _needs(name: str):
     return [NEEDS_KERNELS] if name.startswith("edge_") else []
 
 
-@pytest.mark.parametrize("name", [pytest.param(b, marks=_needs(b)) for b in BACKENDS])
+@pytest.mark.parametrize(
+    "name", [pytest.param(b, marks=_needs(b)) for b in BACKENDS if b != "edge_quant"]
+)
 def test_every_backend_exports_loads_and_runs_in_worker(name, tmp_path):
     m = _model()
     x = torch.randn(1, 3, 8, 8)
