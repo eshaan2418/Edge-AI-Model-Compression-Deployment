@@ -153,6 +153,17 @@ noise, and the platform caveats are listed in Section~\ref{sec:limits}.
 \small\input{generated/kernel_crossover}
 \end{center}
 
+\subsection{Stretch: small language models}
+GPTs of roughly 10M/25M/50M parameters (byte-level tokens) are pre-trained on
+TinyStories~\citep{eldan2023tinystories},
+instruction-tuned on TinyStories-Instruct, and aligned with DPO~\citep{rafailov2023dpo} toward
+satisfying the instruction's required-words constraint. The same quantization ladder is then
+applied to each stage. \emph{Capability} is held-out perplexity; \emph{behavior} is the fraction
+of greedy completions containing every required word. The question is whether behavior
+degrades before capability. Speculative decoding~\citep{leviathan2023speculative} with a
+distilled draft is lossless for greedy decoding; we report its acceptance rate.
+\begin{center}\small\input{generated/lm_degradation}\end{center}
+
 \section{Limitations}\label{sec:limits}
 \begin{itemize}
   \item CIFAR-scale models and data. ImageNet validation against the published PTQ numbers

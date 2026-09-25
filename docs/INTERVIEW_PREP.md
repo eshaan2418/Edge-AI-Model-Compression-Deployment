@@ -204,3 +204,22 @@ Proudest: the measurement discipline. Fresh-process replication, fingerprints, e
 - silently evaluating random weights when a checkpoint path was wrong
 
 Cut: breadth that doesn't serve the question. The legacy TFLite path is frozen and SmoothQuant is only claimed if outliers exist; I'd keep resisting new methods until the core studies have results.
+
+---
+
+## Phase 8 (stretch): small-LM track
+
+**1. How do you measure "post-trained behavior" separately from "capability"?**
+Capability is held-out perplexity: how well the model predicts TinyStories text. Behavior is what SFT and DPO specifically trained: satisfying an instruction's constraint, measured as the fraction of greedy completions that contain every required word from TinyStories-Instruct's `Words:` field. It's narrow but unambiguous, automatic and reproducible. Normalizing both to the float model at each stage turns "degrades first" into a per-rung comparison with a seed-bootstrap CI on the gap.
+
+**2. Where do your DPO preference pairs come from, and what's the weakness?**
+The chosen response is the reference story, which satisfies the constraint. The rejected response is the same story with the required words swapped for other words. So the pair differs only in the property being measured, which isolates the behavior cleanly. The weakness is that it's synthetic: the rejected text isn't something the model would produce, so the preferences are easier to learn than real preferences over the model's own samples (on-policy DPO would sample rejections from the SFT model). I'd report that as a limitation, not hide it.
+
+**3. Why is your speculative decoding "lossless," and how do you test it?**
+With greedy verification, a drafted token is accepted only if it equals the target's own argmax at that position. The first disagreement is replaced by the target's token. So the output sequence is exactly what plain greedy decoding of the target would produce; the draft only affects speed. The test asserts token-for-token equality with the target's plain greedy output. For sampling, the Leviathan/Chen rejection scheme preserves the target distribution instead.
+
+**4. Why a byte-level tokenizer instead of the standard BPE?**
+Zero dependencies, no network access, identical behavior in CI and on Colab, and nothing to version. The cost is about 4× longer sequences, which shrinks the effective context and makes tokens/s not comparable with BPE-tokenized models. So I report per byte-token and compare only within this project. For a 10–50M model on TinyStories's small vocabulary, bytes are adequate.
+
+**5. Why did you push back on building this track?**
+The mission gated it on Phases 1–7 having real results, and none exist yet. It adds breadth (a second model family, three new training stages) while the core question, early predictability of compressibility, is still waiting on its runs. I built it because it was asked for, reused the quantizers, DB and statistics rather than creating a parallel stack, and kept it to one clear question. The priority is still to run the Phase 1–7 experiments first.

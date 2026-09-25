@@ -71,8 +71,10 @@ Resume point for autonomous work. Updated after every commit.
 then `./reproduce.sh`, then writing the headline finding from `results/figures/`.
 Phase 8 (small-LM track) is not started: it is gated on 1-7 having real results.
 
-### Later phases
-8 small-LM (stretch; only after phases 1-7 have real results)
+### Phase 8 (small-LM, stretch): CODE COMPLETE on `phase8-small-lm` (started on request)
+- lm/ (tokenizer, data, GPT + KV cache, train stages pretrain/SFT/distill/DPO, eval, ladder,
+  pipeline), analysis/lm_degradation.py (in reproduce.sh + paper), configs/lm/, docs/lm.md.
+- Results PENDING (NEEDS ESHAAN 10). Recommendation unchanged: run the Phase 1-7 experiments first.
 
 ## Open issues
 - The laptop was on battery during development: real benchmark runs need AC power (strict_environment).
@@ -111,3 +113,5 @@ Phase 8 (small-LM track) is not started: it is gated on 1-7 having real results.
 9. **Phase 6 targets + figures** (after 8): `python -m edge_ai_compression.experiments.compress_runs --device cuda`
    (add `--all-steps` for compressibility-over-training), then `./reproduce.sh`. Check
    `results/figures/MANIFEST.md`.
+10. **Phase 8 small-LM runs:** `notebooks/tracks.ipynb` lm cells (download TinyStories, then
+    `configs/lm/tinystories_gpt_{10m,25m,50m}.yml` x seeds 0-2), then `./reproduce.sh`.

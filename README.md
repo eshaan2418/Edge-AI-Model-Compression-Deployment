@@ -52,6 +52,7 @@ The runs still to be launched are listed under "NEEDS ESHAAN" in [`PROGRESS.md`]
 | Benchmarking | `benchmarking/` | fresh-process timing, cold-start stages, peak memory, bootstrap CIs, Mann-Whitney comparisons, fingerprint | [benchmarking](docs/benchmarking.md) |
 | Experiment DB | `experiment_db/` | the only results output: experiments, kernel benchmarks, training runs, training signals, per-run artifacts; merge from remote runs | |
 | Analysis | `analysis/` | early predictability, signal ablations, scaling fits, latency proxies, Pareto frontiers, paper tables; each validated on synthetic data with planted answers | [analysis](docs/analysis.md) |
+| Small LMs (stretch) | `lm/` | byte-level GPTs on TinyStories: pretrain → SFT → DPO → quantization ladder; capability vs behavior; KV cache, TTFT, speculative decoding | [lm](docs/lm.md) |
 | Write-up | `paper/`, `docs/blog.md` | workshop paper and blog post, with PENDING markers wherever results are missing | |
 
 Models: ResNets `resnet{10,18,34}_w{0.25,0.5,1.0}_cifar` (plus `resnet18_cifar`), ViTs
