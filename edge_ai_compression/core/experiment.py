@@ -24,7 +24,7 @@ class PruningSection:
     scorer: str = "magnitude"
 
 
-QUANT_METHODS = ("rtn", "adaround", "brecq", "qat")
+QUANT_METHODS = ("rtn", "adaround", "brecq", "qat", "hawq")
 QUANT_KEYS = {
     "enabled",
     "method",
@@ -64,7 +64,10 @@ class QuantizationSection:
     def tag(self) -> str:
         act = f"a{self.act_bits}" if self.act_bits else "afp"
         gran = f"g{self.group_size}" if self.group_size else self.granularity
-        return f"{self.method}:w{self.weight_bits}{act}:{gran}"
+        bits = (
+            f"avg{self.options.get('avg_bits', 6.0)}" if self.method == "hawq" else self.weight_bits
+        )
+        return f"{self.method}:w{bits}{act}:{gran}"
 
     def to_dict(self) -> dict[str, Any]:
         """YAML shape (method options under the method's key); round-trips with from_dict."""

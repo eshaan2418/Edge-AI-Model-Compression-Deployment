@@ -196,12 +196,14 @@ def quantize_model(
     act_bits: int | None,
     *,
     first_last_bits: int | None = 8,
+    layer_bits: dict[str, int] | None = None,
 ) -> list[str]:
     """Replace every Conv2d / Linear with its quantized wrapper (in place).
 
     With ``first_last_bits`` the first and last quantized layers (in forward
     order) use that many weight bits, per channel, as is standard practice
-    (AdaRound and BRECQ keep them at 8 bits). Returns layer names in forward order.
+    (AdaRound and BRECQ keep them at 8 bits). ``layer_bits`` overrides the weight
+    bits of named layers (mixed precision). Returns layer names in forward order.
     """
     gm = fx.symbolic_trace(model)
     order = [
@@ -216,6 +218,13 @@ def quantize_model(
         layer_spec = spec
         if first_last_bits is not None and i in (0, len(order) - 1):
             layer_spec = WeightSpec(bits=first_last_bits, granularity="per_channel")
+        if layer_bits and name in layer_bits:
+            layer_spec = WeightSpec(
+                bits=layer_bits[name],
+                granularity=layer_spec.granularity,
+                group_size=layer_spec.group_size,
+                method=layer_spec.method,
+            )
         if isinstance(layer, nn.Conv2d):
             new: QuantLayer = QuantConv2d(layer, layer_spec, act_bits)
         else:

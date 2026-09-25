@@ -30,9 +30,21 @@ Resume point for autonomous work. Updated after every commit.
 - Research configs ready, results PENDING (need AC power): `studies/kernel_sparsity_m5.yml`,
   `sweeps/backend_latency_m5.yml`. Docs: docs/inference.md.
 
-### Next: Phase 3 (PTQ/QAT ladder), branch `phase3-ptq` stacked on `phase2-kernels`
-Plan to write into DECISIONS first. Key constraint (D1.14): torch 2.14 deprecates quantized dtypes,
-so build the ladder on fake-quant simulation + our int kernels, not torch.ao quantized modules.
+### Phase 3 (PTQ/QAT ladder) in progress, branch `phase3-ptq` (pushed regularly)
+Done:
+- `pretraining/` trainer (log-spaced checkpoints, training_runs.csv) + train_model.py; configs
+  train/smoke_train.yml, train/resnet18_cifar10.yml.
+- `compression/quantization/`: quantizer (grids, scales, observers), modules (QuantConv2d/Linear,
+  fold_bn, quantize_model with first/last + per-layer bits), calibration, ptq.run_quantization,
+  reconstruction (AdaRound layer / BRECQ block, optional Fisher), qat (LSQ), hawq (ILP) +
+  analysis/hessian.py (Hutchinson). Methods: rtn, adaround, brecq, qat, hawq.
+- Engine `quant` mode / backend `edge_quant`: exact per-layer lowering (D3.6). torch.ao removed.
+
+Next:
+1. ViT models (3 sizes) + SmoothQuant (+ outlier measurement first).
+2. Ladder configs (CIFAR-10 ResNet-18 from trained checkpoint; ViT) + sweep; Colab/Kaggle notebook
+   for baseline training + ladder; ImageNet validation config (D3.3).
+3. Docs (docs/quantization.md), INTERVIEW_PREP Phase 3, push, CI green.
 
 ### Later phases
 3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
