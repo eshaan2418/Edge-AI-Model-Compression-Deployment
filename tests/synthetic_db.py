@@ -61,3 +61,39 @@ def write_early_prediction_db(root: Path, seed: int = 0) -> Path:
     pd.DataFrame(signals).to_csv(root / "training_signals.csv", index=False)
     pd.DataFrame(exps).to_csv(root / "experiments.csv", index=False)
     return root
+
+
+def write_scaling_db(root: Path, seed: int = 0) -> Path:
+    """Planted power law for `standard` (b = 0.4) and a flat series for `flat`."""
+    rng = np.random.default_rng(seed)
+    runs, exps = [], []
+    for params in (1e5, 3e5, 1e6, 3e6, 1e7):
+        for variant in ("standard", "flat"):
+            for s in range(3):
+                run_id = f"{variant}-{int(params)}-s{s}"
+                runs.append(
+                    {
+                        "run_id": run_id,
+                        "model": f"m{int(params)}",
+                        "variant": variant,
+                        "variant_options": "{}",
+                        "seed": s,
+                        "epochs": 30,
+                        "steps": 100,
+                    }
+                )
+                drop = 0.3 * (params / 1e5) ** -0.4 + 0.02 if variant == "standard" else 0.05
+                exps.append(
+                    {
+                        "source_run_id": run_id,
+                        "source_step": 100,
+                        "pruning_type": W4A8[0],
+                        "quantization_type": W4A8[1],
+                        "accuracy_drop": drop + 0.003 * rng.standard_normal(),
+                        "num_params": int(params),
+                    }
+                )
+    root.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(runs).to_csv(root / "training_runs.csv", index=False)
+    pd.DataFrame(exps).to_csv(root / "experiments.csv", index=False)
+    return root
