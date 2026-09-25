@@ -71,7 +71,7 @@ then `./reproduce.sh`, then writing the headline finding from `results/figures/`
 Phase 8 (small-LM track) is not started: it is gated on 1-7 having real results.
 
 ### Later phases
-3 PTQ/QAT ladder · 4 pruning + recovery · 5 pre-training + signals · 6 studies + analysis · 7 paper/blog · 8 small-LM (stretch)
+8 small-LM (stretch; only after phases 1-7 have real results)
 
 ## Open issues
 - The laptop was on battery during development: real benchmark runs need AC power (strict_environment).
