@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 import time
 import uuid
 from dataclasses import dataclass
@@ -160,6 +161,9 @@ def run_training(cfg: TrainConfig) -> TrainResult:
     steps, history = train_model(model, train_loader, cfg, on_checkpoint=save)
     train_seconds = time.perf_counter() - t0
     acc, loss = accuracy_on_loader(model, test_loader, cfg.device)
+    if cfg.export_path:
+        Path(cfg.export_path).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(checkpoints[-1], cfg.export_path)
 
     with open(run_dir / "config.yaml", "w", encoding="utf-8") as f:
         yaml.safe_dump(cfg.to_dict(), f, sort_keys=False)

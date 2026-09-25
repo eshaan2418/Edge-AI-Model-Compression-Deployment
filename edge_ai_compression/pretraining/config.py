@@ -38,6 +38,7 @@ class TrainConfig:
     schedule: str = "cosine"
     num_checkpoints: int = 8
     checkpoint_dir: str = "models/checkpoints"
+    export_path: str | None = None  # also copy the final checkpoint here (stable path for configs)
     results_dir: str = "results"
     log_every_steps: int = 50
 
@@ -62,7 +63,9 @@ class TrainConfig:
         kwargs: dict[str, Any] = {}
         for key, value in d.items():
             default = getattr(defaults, key)
-            if value is None or default is None:
+            if key == "export_path":
+                kwargs[key] = None if value is None else str(value)
+            elif value is None or default is None:
                 kwargs[key] = value if value is None else int(value)
             elif isinstance(default, bool):
                 kwargs[key] = bool(value)

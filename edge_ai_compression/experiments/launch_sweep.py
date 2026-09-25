@@ -1,8 +1,23 @@
+"""Run a sweep of experiment variants sequentially, resuming where it left off.
+
+Sweep YAML:
+  sweep_id: name (state file: results/sweeps/<sweep_id>_state.jsonl)
+  base_config: experiment YAML every variant is merged into
+  variants: [ {override...}, ... ]            # explicit list, and/or
+  axes: [ [ {override}, ... ], [ ... ] ]      # cartesian product of override lists
+
+Each variant is deep-merged into the base config. Variants already recorded in
+the state file are skipped, so re-running the same command resumes an
+interrupted sweep.
+"""
+
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -11,33 +26,58 @@ from edge_ai_compression.core.runner import ExperimentRunner
 from edge_ai_compression.utils.config_loader import merge_dict
 
 
-def _run_variant(base_path: Path, variant: dict[str, object], sweep_id: str) -> dict[str, object]:
-    cfg_dict = yaml.safe_load(base_path.read_text(encoding="utf-8"))
-    merged = merge_dict(cfg_dict, variant)
-    cfg = ExperimentConfig.from_dict(merged)
-    res = ExperimentRunner(cfg).run()
-    return {"variant": variant, "result": res.to_dict(), "sweep_id": sweep_id}
+def expand_variants(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    variants = [dict(v) for v in spec.get("variants", [])]
+    axes = spec.get("axes")
+    if axes:
+        for combo in itertools.product(*axes):
+            merged: dict[str, Any] = {}
+            for part in combo:
+                merged = merge_dict(merged, part)
+            variants.append(merged)
+    if not variants:
+        raise ValueError("sweep needs `variants` and/or `axes`")
+    return variants
+
+
+def variant_key(variant: dict[str, Any]) -> str:
+    return json.dumps(variant, sort_keys=True, default=str)
+
+
+def run_sweep(spec: dict[str, Any], state_dir: Path = Path("results") / "sweeps") -> Path:
+    base = yaml.safe_load(Path(spec["base_config"]).read_text(encoding="utf-8"))
+    sweep_id = str(spec.get("sweep_id", "sweep"))
+    variants = expand_variants(spec)
+    state_path = state_dir / f"{sweep_id}_state.jsonl"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    done = set()
+    if state_path.is_file():
+        done = {
+            variant_key(json.loads(line)["variant"]) for line in state_path.read_text().splitlines()
+        }
+    for i, variant in enumerate(variants, 1):
+        if variant_key(variant) in done:
+            print(f"[{i}/{len(variants)}] skip (done): {variant}")
+            continue
+        cfg = ExperimentConfig.from_dict(merge_dict(base, variant))
+        result = ExperimentRunner(cfg).run()
+        with open(state_path, "a", encoding="utf-8") as f:
+            f.write(
+                json.dumps(
+                    {"variant": variant, "result": result.to_dict(), "sweep_id": sweep_id},
+                    default=str,
+                )
+                + "\n"
+            )
+        print(f"[{i}/{len(variants)}] done: {variant} -> {result.extras['experiment_id']}")
+    return state_path
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Launch compression sweep (sequential runner; Phase 14)"
-    )
-    p.add_argument(
-        "--config", type=Path, required=True, help="Sweep YAML with base_config and variants"
-    )
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+    p.add_argument("--config", type=Path, required=True, help="sweep YAML")
     args = p.parse_args()
-    spec = yaml.safe_load(args.config.read_text(encoding="utf-8"))
-    base = Path(spec["base_config"])
-    sweep_id = str(spec.get("sweep_id", "sweep"))
-    variants = list(spec.get("variants", []))
-    state_path = Path("results") / "sweeps" / f"{sweep_id}_state.jsonl"
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-
-    for v in variants:
-        row = _run_variant(base, v, sweep_id)
-        with open(state_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(row, default=str) + "\n")
+    run_sweep(yaml.safe_load(args.config.read_text(encoding="utf-8")))
 
 
 if __name__ == "__main__":

@@ -35,12 +35,17 @@ def test_config_rejects_unknown_keys_and_variants():
 
 def test_smoke_training_logs_run_and_checkpoints(tmp_path):
     raw = load_yaml(SMOKE)
-    raw.update(checkpoint_dir=str(tmp_path / "ckpt"), results_dir=str(tmp_path / "results"))
+    raw.update(
+        checkpoint_dir=str(tmp_path / "ckpt"),
+        results_dir=str(tmp_path / "results"),
+        export_path=str(tmp_path / "final.pt"),
+    )
     result = run_training(TrainConfig.from_dict(raw))
     assert result.steps == 8  # 2 epochs x ceil(32 / 8)
     assert len(result.checkpoints) == 3 and result.checkpoints[-1].endswith("step_0000008.pt")
     ckpt = torch.load(result.checkpoints[-1], weights_only=False)
     assert ckpt["step"] == 8 and "model_state" in ckpt
+    assert torch.load(tmp_path / "final.pt", weights_only=False)["step"] == 8
     with open(tmp_path / "results" / "training_runs.csv", newline="") as f:
         row = next(csv.DictReader(f))
     assert row["run_id"] == result.run_id and row["steps"] == "8"
