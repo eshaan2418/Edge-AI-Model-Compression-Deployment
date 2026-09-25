@@ -74,3 +74,6 @@ legacy/tflite/benchmark_results.md
 # IDEs
 .vscode/
 .idea/
+
+# C++ kernel build (build/ is ignored above)
+edge_ai_compression/inference/_C*.so

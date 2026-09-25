@@ -31,7 +31,11 @@ tf = ["tensorflow>=2.16", "tf-keras>=2.16"]
 tf-mot = ["tensorflow>=2.16", "tf-keras>=2.16", "tensorflow-model-optimization>=0.8"]
 viz = ["matplotlib>=3.8"]
 dev = ["pytest>=7.4", "ruff==0.16.8"]
-all = ["edge-ai-compression[tf-mot,viz,dev]"]
+# Build tooling for the C++ kernels (scripts/build_kernels.sh).
+kernels = ["nanobind>=2.4", "cmake>=3.26", "ninja>=1.11"]
+# PyTorch -> ONNX export and the ONNX Runtime backend.
+export = ["onnx>=1.16", "onnxruntime>=1.18", "onnxscript>=0.1"]
+all = ["edge-ai-compression[tf-mot,viz,dev,kernels,export]"]
 
 [project.scripts]
 auto-compress = "edge_ai_compression.auto_compress:main"

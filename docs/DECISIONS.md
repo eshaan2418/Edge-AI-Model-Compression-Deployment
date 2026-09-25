@@ -78,3 +78,32 @@ decided, alternatives considered, and why.
 ### D1.14 Quantized engine selected explicitly
 - **Finding:** on torch 2.14 / macOS arm64 the quantized engine defaults to `none`, so the framework's dynamic quantization failed with `NoQEngine` on the primary platform. `utils/quant_engine.py` selects x86 > fbgemm > qnnpack.
 - **Also noted:** torch 2.14 warns that quantized tensor dtypes (`qint8`, ...) are deprecated and will be removed. This shapes Phase 3: build quantization on simulated (fake-quant) float ops plus our own integer kernels (Phase 2), not on `torch.ao` quantized modules.
+
+---
+
+## Phase 2: C++ kernels + export
+
+### Plan (self-approved under the autonomy rules)
+- `csrc/`: standalone CMake project, one nanobind extension `edge_ai_compression.inference._C`. Single-threaded kernels with runtime ISA dispatch (scalar reference, NEON+dotprod, AVX2+FMA, AVX-512BW). Explicit ISA selection so tests can check every SIMD path against scalar.
+  - `gemm_f32`: C[M,N] = A[M,K]·B[K,N] (+bias per row, optional ReLU). A (weights) pre-packed as 4-row panels `[M/4][K][4]`, 4×16 register tile, K-blocking.
+  - `gemm_s8`: int8×int8→int32, bit-exact. NEON `vdotq_laneq_s32` on 4×4-interleaved panels; AVX2/AVX-512 sign-extend to int16 + `madd_epi16` (exact, no `maddubs` saturation).
+  - `requantize`: int32 → f32 with per-row weight scale × activation scale + bias (+ReLU).
+  - `gemm_w4`: int4 weight-only (symmetric, per-group scales), dequantized per K-block into the f32 panel format, then the f32 microkernel.
+  - `gemm_sparse24`: 2:4 structured sparse weights (2 values + 2-bit indices per group of 4 along K).
+  - `gemm_csr`: unstructured sparse weights (CSR), for the "why unstructured sparsity rarely speeds up" study.
+  - `im2col` (f32, int8), `quantize_s8`, `absmax`, and microbenchmarks (peak FMA GFLOP/s, peak int8 GOP/s, triad bandwidth) for roofline.
+- `edge_ai_compression/inference/`: Python wrappers, weight packing/quantization (numpy), an FX-based engine that runs ResNets on the kernels (BN folded), ONNX export + ONNX Runtime backend, a backend registry wired into the benchmark worker, roofline analysis, and a kernel-benchmark table in the experiment DB.
+- Tests: bit-exact int8 vs numpy int32, tolerance for float; odd shapes, K=1, non-multiple-of-tile M/N/K, int8 extremes (overflow), non-contiguous inputs rejected; engine vs torch eager; ORT vs eager.
+
+### D2.1 CMake project separate from the Python package build
+- **Alternatives:** scikit-build-core as the package build backend (so `pip install -e .` compiles C++).
+- **Why:** keeps `pip install -e .` fast and pure-Python for users who don't need kernels, and keeps the C++ build explicit and debuggable. CI runs `scripts/build_kernels.sh`, then the kernel tests with `EDGEAI_REQUIRE_KERNELS=1`, so a missing build fails CI instead of silently skipping.
+
+### D2.2 Kernels are single-threaded (for now)
+- **Why:** Apple clang ships without OpenMP, and a correct low-overhead thread pool is its own project. Kernel-vs-baseline comparisons therefore run everything at 1 thread (`torch.set_num_threads(1)`, ORT `intra_op_num_threads=1`), which is the fair comparison. Multi-threading is a later extension. This is a limitation for absolute latency claims.
+
+### D2.3 Symmetric int8 with range [-127, 127]
+- Weights per-output-channel, activations per-tensor (dynamic absmax in Phase 2; static calibration in Phase 3). Excluding -128 keeps quantization symmetric and makes negation safe. Costs 1 of 256 levels.
+
+### D2.4 No TFLite / ExecuTorch backends
+- **Why:** no edge device to run them on, and each is a large integration. ONNX Runtime is the strong, portable baseline. The legacy TFLite scripts remain for reference.

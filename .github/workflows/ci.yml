@@ -7,7 +7,12 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # ubuntu-latest: x86-64 (AVX2 kernel paths); macos-14: Apple Silicon (NEON paths).
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -16,13 +21,19 @@ jobs:
       - name: Install
         run: |
           python -m pip install -U pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,kernels,export]"
+      - name: Build C++ kernels
+        run: scripts/build_kernels.sh
       - name: Ruff (lint)
         run: ruff check .
       - name: Ruff (format)
         run: ruff format --check .
       - name: Pytest
-        run: pytest -q
+        env:
+          EDGEAI_REQUIRE_KERNELS: "1"
+        run: |
+          python -c "from edge_ai_compression.inference import kernels; print('ISAs:', kernels.supported_isas())"
+          pytest -q
       - name: Smoke experiments (offline, synthetic data)
         run: |
           python run_experiment.py --config edge_ai_compression/configs/experiments/smoke_cpu.yml
