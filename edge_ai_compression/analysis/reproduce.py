@@ -14,11 +14,17 @@ from collections.abc import Callable
 from pathlib import Path
 
 from edge_ai_compression.analysis.common import InsufficientData, read_table
+from edge_ai_compression.analysis.paper_tables import write_paper_tables
 from edge_ai_compression.experiments.compress_runs import PANEL
 
 
 def _kernel_study(results: Path, out: Path) -> list[Path]:
-    from edge_ai_compression.analysis.kernel_study import load_rows, plot_sparsity, sparsity_table
+    from edge_ai_compression.analysis.kernel_study import (
+        crossover,
+        load_rows,
+        plot_sparsity,
+        sparsity_table,
+    )
     from edge_ai_compression.inference.roofline import (
         peaks_from_rows,
         plot_roofline,
@@ -33,6 +39,7 @@ def _kernel_study(results: Path, out: Path) -> list[Path]:
         rows = load_rows(results, study)
         table = sparsity_table(rows)
         table.to_csv(out / f"{study}_sparsity_table.csv", index=False)
+        crossover(table).to_csv(out / f"{study}_crossover.csv", index=False)
         written.append(plot_sparsity(table, out / f"{study}_sparsity.png"))
         study_rows = kernels[kernels["study"] == study]
         peaks = peaks_from_rows(study_rows)
@@ -139,7 +146,9 @@ ANALYSES: dict[str, tuple[tuple[str, ...], str, Callable[[Path, Path], list[Path
 }
 
 
-def reproduce(results: Path, out: Path) -> dict[str, str]:
+def reproduce(results: Path, out: Path, paper_out: Path | None = None) -> dict[str, str]:
+    """Regenerate figures/tables into ``out`` and paper tables into ``paper_out``
+    (default ``out / "paper"``)."""
     out.mkdir(parents=True, exist_ok=True)
     status: dict[str, str] = {}
     lines = ["# Figures and tables", "", f"Regenerated from `{results}` by `reproduce.sh`.", ""]
@@ -160,6 +169,9 @@ def reproduce(results: Path, out: Path) -> dict[str, str]:
         except Exception:  # noqa: BLE001  (record, keep regenerating the rest)
             status[name] = "error"
             lines.append(f"- **{name}**: ERROR\n\n```\n{traceback.format_exc()[-1500:]}\n```")
+    tables = write_paper_tables(results, out, paper_out or out / "paper")
+    lines += ["", "## Paper tables", ""]
+    lines += [f"- `{n}.tex`: {'data' if ok else 'PENDING'}" for n, ok in tables.items()]
     (out / "MANIFEST.md").write_text("\n".join(lines) + "\n")
     return status
 
@@ -168,8 +180,16 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     p.add_argument("--results", type=Path, default=Path("results"))
     p.add_argument("--out", type=Path, default=Path("results/figures"))
+    p.add_argument(
+        "--paper-out",
+        type=Path,
+        default=None,
+        help="where to write paper tables (default: paper/generated when --results is the "
+        "real DB 'results', otherwise <out>/paper so smoke numbers never reach the paper)",
+    )
     a = p.parse_args()
-    status = reproduce(a.results, a.out)
+    paper_out = a.paper_out or (Path("paper/generated") if a.results == Path("results") else None)
+    status = reproduce(a.results, a.out, paper_out)
     for name, state in status.items():
         print(f"{name}: {state}")
     if "error" in status.values():
