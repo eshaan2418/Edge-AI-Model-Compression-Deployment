@@ -1,0 +1,20 @@
+# Small-LM track, gpt_50m on TinyStories (Phase 8). Download the data first
+# (notebooks/tracks.ipynb, lm cells). Run once per seed: --set seed=N.
+size: gpt_50m
+draft: gpt_10m
+data: tinystories
+stories_path: data/tinystories/TinyStoriesV2-GPT4-train.txt
+eval_stories_path: data/tinystories/TinyStoriesV2-GPT4-valid.txt
+instruct_path: data/tinystories/TinyStories-Instruct-train.txt
+eval_instruct_path: data/tinystories/TinyStories-Instruct-valid.txt
+device: cuda
+seed: 0
+batch_size: 64
+lr: 0.0006
+steps: {pretrain: 40000, sft: 2000, dpo: 500, distill: 5000}
+eval_stories: 500
+constraint_examples: 200
+max_new: 200
+methods: [fp, w8a8, w8a16, w4a16_g32, w4a8, w3a16_g32]
+results_dir: results
+models_dir: models/lm
